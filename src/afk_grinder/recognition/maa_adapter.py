@@ -22,6 +22,7 @@ from typing import Any
 PINNED_MAA_VERSION = "5.14.3"
 MAA_SOURCE_REVISION = "8963191215ca49d6b037802acd07d20a4213160a"
 FRAME_CACHE_LIMIT = 2
+REPLACEMENT_PROBE = "afk-grinder-sdk-replacement-v1"
 
 
 class SDKError(RuntimeError):
@@ -112,12 +113,30 @@ def read_only_controller_type(base: type) -> type:
     return ReadOnlyController
 
 
-def probe_sdk() -> dict[str, Any]:
+def _probe_replacement_marker(library: Any) -> str:
+    """Check the inert export in the already loaded private test library."""
+    import ctypes
+
+    try:
+        marker = library.framework().AfkGrinderReplacementProbe
+        marker.argtypes = []
+        marker.restype = ctypes.c_char_p
+        value = marker()
+    except (AttributeError, OSError, TypeError) as error:
+        raise SDKError("Private SDK replacement marker is unavailable.") from error
+    if value != REPLACEMENT_PROBE.encode("ascii"):
+        raise SDKError("Private SDK replacement marker did not match.")
+    return REPLACEMENT_PROBE
+
+
+def probe_sdk(*, require_replacement: bool = False) -> dict[str, Any]:
     """Exercise real lifecycle on a synthetic frame, without OS controllers.
 
     This function belongs in the disposable diagnostic process, never in the
     UI or live input worker. It does not import Toolkit or load resource packs.
     """
+    if type(require_replacement) is not bool:
+        raise SDKError("SDK replacement diagnostic mode must be a boolean.")
     if "MAAFW_BINARY_PATH" in os.environ:
         raise SDKError("Remove MAAFW_BINARY_PATH; external SDK overrides are disabled.")
     try:
@@ -158,7 +177,7 @@ def probe_sdk() -> dict[str, Any]:
         if not tasker.bind(resource, controller):
             raise SDKError("SDK refused recognition-only controller binding.")
         wait_for_job(tasker.post_stop())
-        return {
+        report = {
             "sdk_version": version,
             "native_version": native_version,
             "source_revision": MAA_SOURCE_REVISION,
@@ -171,6 +190,9 @@ def probe_sdk() -> dict[str, Any]:
             "custom_controller": "input callbacks disabled",
             "cancellation": "passed",
         }
+        if require_replacement:
+            report["replacement_probe"] = _probe_replacement_marker(library)
+        return report
     except SDKError:
         raise
     except Exception as exc:

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "release": "v3.0.0",
+  "scope": "Binary prerequisites for private SDK source-build tests; not corresponding source or distribution approval.",
+  "targets": {
+    "macos-arm64": {
+      "system": "darwin",
+      "architecture": "arm64",
+      "triplet": "maa-arm64-osx",
+      "archive_name": "MaaDeps-arm64-osx.tar.xz",
+      "url": "https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-arm64-osx.tar.xz",
+      "size": 49529768,
+      "sha256": "407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67"
+    },
+    "macos-x64": {
+      "system": "darwin",
+      "architecture": "x86_64",
+      "triplet": "maa-x64-osx",
+      "archive_name": "MaaDeps-x64-osx.tar.xz",
+      "url": "https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-x64-osx.tar.xz",
+      "size": 53935236,
+      "sha256": "794607ac2d45bae117fb97ba866ba43e1d7495d7f52410a90fc12a5c419fa0a4"
+    },
+    "windows-x64": {
+      "system": "win32",
+      "architecture": "AMD64",
+      "triplet": "maa-x64-windows",
+      "archive_name": "MaaDeps-x64-windows.tar.xz",
+      "url": "https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-x64-windows.tar.xz",
+      "size": 125763732,
+      "sha256": "3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6"
+    }
+  }
+}

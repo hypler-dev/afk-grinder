@@ -26,6 +26,11 @@ on:
       - "licenses/**"
       - ".github/workflows/build.yml"
   workflow_dispatch:
+    inputs:
+      verify_source_replacement:
+        description: Rebuild the pinned SDK and verify a separate private copy (JSON evidence only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,7 +43,7 @@ jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +117,20 @@ jobs:
           --label '${{ matrix.label }}' --commit "$GITHUB_SHA"
           --output build-evidence/sdk-inventory.json --require-sdk
 
+      - name: Verify source-built SDK replacement in a private copy
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_source_replacement
+        timeout-minutes: 17
+        run: |
+          if [ '${{ matrix.label }}' = 'windows-x64' ]; then
+            sdk_bundle='dist/AFKGrinder'
+          else
+            sdk_bundle='dist/AFKGrinder.app'
+          fi
+          uv run --locked --extra build --extra recognition python -m tools.verify_sdk_replacement \
+            --label '${{ matrix.label }}' --commit "$GITHUB_SHA" --bundle "$sdk_bundle" \
+            --work 'build/sdk-source-replacement-${{ matrix.label }}' \
+            --output build-evidence/sdk-replacement.json
+
       - name: Rebuild downloadable prototype without optional SDK
         run: uv run --locked --extra build --extra recognition python tools/build.py
 
@@ -137,5 +156,14 @@ jobs:
         with:
           name: SDK-inventory-${{ matrix.label }}-${{ github.sha }}
           path: build-evidence/sdk-inventory.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload source replacement evidence as JSON only
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_source_replacement
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SDK-replacement-${{ matrix.label }}-${{ github.sha }}
+          path: build-evidence/sdk-replacement.json
           if-no-files-found: error
           retention-days: 14

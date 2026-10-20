@@ -42,13 +42,15 @@ class SDKBoundaryTests(unittest.TestCase):
         }
         return modules, tasker_type, tasker
 
-    def probe(self, **kwargs):
+    def probe(self, *, require_replacement=False, marker=None, **kwargs):
         modules, tasker_type, tasker = self.fake_modules(**kwargs)
+        if marker is not None:
+            modules["maa.library"].Library.framework = Mock(return_value=SimpleNamespace(AfkGrinderReplacementProbe=marker))
         with patch.dict(adapter.os.environ, {}, clear=True), \
              patch.object(adapter.importlib.metadata, "version", return_value="5.14.3"), \
              patch.object(adapter.importlib.util, "find_spec", return_value=object()), \
              patch.object(adapter.importlib, "import_module", side_effect=modules.__getitem__):
-            report = adapter.probe_sdk()
+            report = adapter.probe_sdk(require_replacement=require_replacement)
         return report, tasker_type, tasker
 
     def test_success_requires_all_privacy_options_and_cancellation(self):
@@ -67,6 +69,38 @@ class SDKBoundaryTests(unittest.TestCase):
                      "set_stdout_level", "set_reco_image_cache_limit", "set_cpu"):
             with self.subTest(name=name), self.assertRaises(adapter.SDKError):
                 self.probe(refused=name)
+
+    def test_private_replacement_diagnostic_requires_loaded_library_marker(self):
+        marker = Mock(return_value=adapter.REPLACEMENT_PROBE.encode("ascii"))
+        report, _, tasker = self.probe(require_replacement=True, marker=marker)
+        self.assertEqual(report["replacement_probe"], adapter.REPLACEMENT_PROBE)
+        self.assertFalse(report["native_input"])
+        self.assertEqual(report["capture_source"], "synthetic")
+        marker.assert_called_once_with()
+        tasker.post_stop.assert_called_once()
+        with self.assertRaisesRegex(adapter.SDKError, "marker is unavailable"):
+            self.probe(require_replacement=True)
+        for value in (None, b"wrong", "afk-grinder-sdk-replacement-v1"):
+            with self.subTest(value=value), self.assertRaisesRegex(adapter.SDKError, "marker did not match"):
+                self.probe(require_replacement=True, marker=Mock(return_value=value))
+
+    def test_normal_diagnostic_does_not_call_replacement_export(self):
+        marker = Mock(side_effect=RuntimeError("must not run"))
+        report, _, _ = self.probe(marker=marker)
+        marker.assert_not_called()
+        self.assertNotIn("replacement_probe", report)
+
+    def test_replacement_mode_rejected_before_import_and_reserved_to_worker(self):
+        with patch.object(adapter.importlib, "import_module") as load:
+            with self.assertRaisesRegex(adapter.SDKError, "must be a boolean"):
+                adapter.probe_sdk(require_replacement="yes")
+        load.assert_not_called()
+        from afk_grinder.__main__ import main
+
+        with patch.object(sys, "argv", ["AFKGrinder", "--dry-run", "--sdk-replacement-probe"]), \
+             patch.object(sys, "stderr", Mock()), self.assertRaises(SystemExit) as exited:
+            main()
+        self.assertEqual(exited.exception.code, 2)
 
     def test_native_version_must_match_exact_pin(self):
         with self.assertRaisesRegex(adapter.SDKError, "Expected native SDK"):

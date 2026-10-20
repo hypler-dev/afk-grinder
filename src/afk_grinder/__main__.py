@@ -19,14 +19,20 @@ def main() -> None:
     mode.add_argument("--sdk-check", action="store_true", help="Check optional local recognition with synthetic pixels only")
     mode.add_argument("--sdk-worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--sdk-report", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--sdk-replacement-probe", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.sdk_report and not args.sdk_worker:
         parser.error("--sdk-report is reserved for the SDK diagnostic worker.")
+    if args.sdk_replacement_probe and not args.sdk_worker:
+        parser.error("--sdk-replacement-probe is reserved for the SDK diagnostic worker.")
     if args.sdk_check or args.sdk_worker:
         from .recognition.maa_adapter import SDKError, diagnostic, probe_sdk
 
         try:
-            report = probe_sdk() if args.sdk_worker else diagnostic()
+            if args.sdk_worker:
+                report = probe_sdk(require_replacement=True) if args.sdk_replacement_probe else probe_sdk()
+            else:
+                report = diagnostic()
             if args.sdk_report:
                 with args.sdk_report.open("x", encoding="utf-8") as report_file:
                     json.dump({"ok": True, "report": report}, report_file)

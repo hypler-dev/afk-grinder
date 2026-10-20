@@ -1,185 +1,74 @@
-# Private SDK source and replacement procedure
+# Private SDK source-replacement procedure
 
-Authority: [intent.md](../intent.md). Distribution requirements and open gates: [DEPENDENCIES.md](DEPENDENCIES.md#sdk-bearing-distribution-gate). Current acceptance evidence: [plan.md](../plan.md).
+Authority: [intent.md](../intent.md). Distribution gate: [DEPENDENCIES.md](DEPENDENCIES.md#sdk-bearing-distribution-gate). Current evidence: [plan.md](../plan.md).
 
-This procedure covers a private macOS arm64 recognition build. It does not publish SDK binaries, install an application, grant macOS permissions, or establish complete corresponding-source coverage. The source-preparation tool supports Windows and macOS; the native rebuild and replacement below have been tested only on this Mac. Windows, Intel Mac, signed distribution and clean-machine replacement remain open.
+This developer-only tooling supports a private frozen-copy experiment. It does not publish SDK binaries, install an application, grant macOS permissions, capture a window, send native input, or change the downloadable prototype. The verifier requires a matching host process: `macos-arm64` on arm64 macOS, `macos-x64` on x64 macOS, or `windows-x64` on Windows AMD64. A mismatched target label is rejected; physical hardware and emulation status are not independently attested.
 
-## Prepare the pinned source chain
+## Prepare pinned sources
 
-From the repository root, choose a new destination whose parent already exists:
+Run from the repository root. Choose a new destination whose parent already exists:
 
 ```sh
 python3 -m tools.fetch_sdk_sources --destination /private/tmp/afk-grinder-sdk-source
 ```
 
-The fixed [sdk_sources.json](../tools/sdk_sources.json) is the source of truth for four official archives, their exact revisions, byte sizes, SHA-256 values and layout. The tool uses TLS-verifying HTTPS transport, verifies bytes before inspection, rejects links/special files/traversal/duplicate paths and limits total regular-file payload and member count. It retains the archives, manifest, upstream source/notices and `PROVENANCE.json`. Publication uses an exclusive native rename; an existing destination, including one created during preparation, is not replaced. Unsupported hosts/filesystems fail closed. It does not build or execute downloaded source and is never called by the application.
+`tools/sdk_sources.json` pins four official source archives, revisions, sizes, SHA-256 values and layout. The preparer verifies bytes before inspection, rejects unsafe paths, links, special files, traversal and duplicates, limits archive size/member count, and publishes by exclusive rename. It retains source archives, manifest, notices and provenance. It does not build or execute downloaded source.
 
-The resulting layout is:
+The output contains `source/MaaFramework`, `archives/`, `sdk_sources.json` and `PROVENANCE.json`. MaaUtils is the pinned Framework submodule; MaaDeps supplies its separately pinned build recipe.
 
-```text
-source/MaaFramework/
-  source/MaaUtils/
-    MaaDeps/
-      vcpkg/
-archives/
-sdk_sources.json
-PROVENANCE.json
-```
+## Prepare binary build prerequisites
 
-MaaUtils is a pinned Framework submodule. Its tree has no further submodules, but `MaaUtils.cmake` includes the separately supplied MaaDeps CMake file. MaaDeps pins vcpkg. The preparer assembles this chain explicitly. Other Framework submodules are not used by the selected build flags and are not fetched.
+The native build also needs one official MaaDeps v3.0.0 archive. The repository manifest fixes target, URL, byte size and SHA-256 for all three labels:
 
-## Supply the native build dependencies
+| Label | Archive | Size | SHA-256 |
+| --- | --- | ---: | --- |
+| `macos-arm64` | `MaaDeps-arm64-osx.tar.xz` | 49,529,768 | `407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67` |
+| `macos-x64` | `MaaDeps-x64-osx.tar.xz` | 53,935,236 | `794607ac2d45bae117fb97ba866ba43e1d7495d7f52410a90fc12a5c419fa0a4` |
+| `windows-x64` | `MaaDeps-x64-windows.tar.xz` | 125,763,732 | `3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6` |
 
-The verified local experiment used CMake 4.4.3, Xcode 26.3 / AppleClang 17 and macOS 26.0 on arm64. CMake upstream requires at least 3.28. These are observed tools, not verified minimum supported systems.
-
-The experiment uses the official prebuilt [MaaDeps v3.0.0 arm64 archive](https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-arm64-osx.tar.xz). It is a **binary build prerequisite**, not a substitute for dependency source. Its 49,529,768 bytes and SHA-256 match official release metadata:
-
-```text
-407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67
-```
+Prepare one target in a new destination:
 
 ```sh
-SDK_ROOT=/private/tmp/afk-grinder-sdk-source
-SDK_SOURCE="$SDK_ROOT/source/MaaFramework"
-SDK_BUILD="$SDK_ROOT/build-arm64"
-SDK_PREFIX="$SDK_SOURCE/source/MaaUtils/MaaDeps"
-
-curl --disable --fail --location --proto '=https' --proto-redir '=https' \
-  --max-time 120 --max-filesize 49529768 \
-  --output "$SDK_ROOT/MaaDeps-arm64-osx.tar.xz" \
-  https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-arm64-osx.tar.xz
-python3 - "$SDK_ROOT/MaaDeps-arm64-osx.tar.xz" "$SDK_PREFIX" <<'PY'
-import hashlib
-from pathlib import Path
-import subprocess
-import sys
-archive = Path(sys.argv[1])
-if archive.stat().st_size != 49529768:
-    raise SystemExit("MaaDeps archive size did not match the pinned release.")
-if hashlib.sha256(archive.read_bytes()).hexdigest() != "407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67":
-    raise SystemExit("MaaDeps archive SHA-256 did not match the pinned release.")
-subprocess.run(["tar", "-xJf", str(archive), "-C", sys.argv[2]], check=True)
+python3 - <<'PY'
+from tools.sdk_build_dependencies import prepare_dependencies
+prepare_dependencies("macos-arm64", "/private/tmp/afk-grinder-sdk-deps")
 PY
 ```
 
-Do not continue after a failed verification command. The dependency archive supplies `vcpkg/installed/maa-arm64-osx` beside the pinned vcpkg source. Complete source coverage and reproducible builds for its native dependencies remain separate distribution work.
+Replace the label for another matching host. The helper downloads over HTTPS, verifies fixed size and SHA-256, safely inspects and extracts only the expected tree (`vcpkg`, `runtime`, `msbuild`, `maadeps.cmake`), rejects traversal, unsafe links, duplicate paths and extraction overwrite, then writes `PROVENANCE.json`. All three raw dependency archives have been verified and safely inspected. MaaDeps remains a binary build prerequisite; it is not corresponding dependency source or distribution approval.
 
-## Rebuild the three recognition libraries
+## Run private replacement verifier
 
-For the recorded modified-library experiment, append this inert export to `source/MaaFramework/API/MaaFramework.cpp` inside the private source tree. It changes no existing input, capture or recognition function:
-
-```cpp
-// Synthetic loader probe for the private replacement experiment only.
-extern "C" MAA_FRAMEWORK_API const char* AfkGrinderReplacementProbe()
-{
-    return "afk-grinder-sdk-replacement-v1";
-}
-```
-
-Retain the original SDK version because the Python binding and application check compatibility with 5.14.3. The source patch and replacement hashes identify this experiment separately; it is not an unmodified upstream binary.
+Use a clean committed checkout and build a private SDK-bearing diagnostic bundle with locked build and recognition extras. Default builds remain SDK-free. The verifier takes an existing bundle and writes evidence to a new location. Its output parents must already exist:
 
 ```sh
-cmake -S "$SDK_SOURCE" -B "$SDK_BUILD" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-  -DCMAKE_INSTALL_PREFIX="$SDK_ROOT/install-arm64" \
-  -DMAA_HASH_VERSION=5.14.3 \
-  -DENABLE_CCACHE=OFF \
-  -DWITH_ADB_CONTROLLER=OFF \
-  -DWITH_WIN32_CONTROLLER=OFF \
-  -DWITH_MACOS_CONTROLLER=OFF \
-  -DWITH_ANDROID_NATIVE_CONTROLLER=OFF \
-  -DWITH_PLAYCOVER_CONTROLLER=OFF \
-  -DWITH_GAMEPAD_CONTROLLER=OFF \
-  -DWITH_LINUX_CONTROLLER=OFF \
-  -DWITH_RECORD_CONTROLLER=OFF \
-  -DWITH_REPLAY_CONTROLLER=OFF \
-  -DWITH_DBG_CONTROLLER=OFF \
-  -DWITH_CUSTOM_CONTROLLER=ON \
-  -DWITH_MAA_AGENT=OFF \
-  -DWITH_NODEJS_BINDING=OFF \
-  -DWITH_QUICKJS_BINDING=OFF \
-  -DBUILD_PICLI=OFF \
-  -DBUILD_SAMPLE=OFF \
-  -DBUILD_PIPELINE_TESTING=OFF \
-  -DBUILD_DLOPEN_TESTING=OFF \
-  -DBUILD_NODE_TEST=OFF \
-  -DBUILD_MACOS_TEST=OFF \
-  -DBUILD_LINUX_TEST=OFF
-cmake --build "$SDK_BUILD" --target MaaFramework --parallel 2
+uv sync --locked --extra build --extra recognition
+uv run --locked --extra build --extra recognition python tools/build.py --with-recognition
+mkdir -p build-evidence
+uv run --locked --extra build --extra recognition python -m tools.verify_sdk_replacement \
+  --label macos-arm64 \
+  --commit "$(git rev-parse HEAD)" \
+  --bundle dist/AFKGrinder.app \
+  --work build/sdk-source-replacement-macos-arm64 \
+  --output build-evidence/sdk-replacement.json
 ```
 
-This produces `libMaaFramework.dylib`, `libMaaUtils.dylib` and `libMaaCustomControlUnit.dylib` under `build-arm64/bin`. A deployment target flag alone does not establish runtime compatibility with that OS version.
+Use Windows bundle path `dist/AFKGrinder` and label `windows-x64` in Git Bash on Windows; use `macos-x64` with `dist/AFKGrinder.app` on x64 macOS. `--work` and `--output` must not already exist and must stay outside the input bundle. The verifier requires CMake 3.28 or newer, pins MaaFramework 5.14.3, builds only the custom-controller configuration, and sets macOS deployment target 13.3. The 13.3 setting is build configuration, not proof of minimum supported macOS. This synthetic marker check does not require or fetch OCR models.
 
-## Replace libraries in a separate private app
+The verifier adds a synthetic marker export to the temporary source tree, builds `MaaFramework`, `MaaUtils` and `MaaCustomControlUnit`, copies the frozen app to a separate private directory, replaces every matching core copy, and preserves each original hash in JSON evidence. Original executable, core-library and version-metadata hashes are checked before and after and must remain unchanged. The frozen synthetic worker must report SDK 5.14.3, the pinned source revision, CPU-only operation, no image/log persistence, no native input, cancellation success and the marker. Mac checks require matching architecture, removal of absolute development RPATHs, only `@loader_path`/`@executable_path`, local ad-hoc signatures and deep strict verification. Mac loader tracing must show replaced cores and bundled dependencies loaded from the private copy; the Windows receipt does not attest every transitive DLL load path.
 
-First build a private SDK-bearing app using the locked build/recognition environment described in [README.md](../README.md#run-from-source). Synthetic OCR additionally requires explicitly fetched, verified private models through `tools/fetch_ocr_models.py`; see [DEPENDENCIES.md](DEPENDENCIES.md#local-replay-and-private-ocr-assets). Default downloads contain no SDK and cannot serve as replacement-test bundles.
+The command prints pass only after these checks. The JSON receipt does not remove SDK publication, production signing, installation or permission gates.
+
+## CI entry point
+
+GitHub Actions runs the verifier only for manual dispatch with boolean input `verify_source_replacement=true`; the default is `false`. The optional upload contains only `build-evidence/sdk-replacement.json`. Normal push and pull-request builds still produce SDK-free downloadable test bundles.
 
 ```sh
-python tools/build.py --with-recognition --with-popup-models
+gh workflow run build.yml --ref main -f verify_source_replacement=true
 ```
 
-Use a separate copy. Close any previous test copy before modifying it. Do not overwrite the app used for live calibration, install this experimental copy, or grant it input/capture permissions.
+## Current evidence and open gates
 
-```sh
-SDK_COPY="$SDK_ROOT/replacement/AFKGrinder.app"
-python3 - "$SDK_COPY" <<'PY'
-from pathlib import Path
-import shutil
-import sys
-target = Path(sys.argv[1])
-if target.exists() or target.is_symlink():
-    raise SystemExit("Replacement destination already exists; choose a new private copy.")
-target.parent.mkdir()
-shutil.copytree("dist/AFKGrinder.app", target, symlinks=True)
-PY
-```
+The new automated native rebuild/replacement verifier has not yet produced a positive run. Current evidence: all three raw MaaDeps archives pass fixed size/SHA verification and safe inspection; the full 351-test source suite passes; the synthetic worker correctly rejects the original SDK when its replacement marker is required. Prior local arm64 manual source build/replacement remains historical evidence only. It does not prove that all three targets source-build successfully.
 
-The observed Mac layout uses physical files at `Contents/Frameworks/maa/bin/` and internal aliases under `Contents/Resources/maa/bin/`. Inspect the actual bundle; do not assume a Windows-style `_internal` directory. Replace the three physical core files while retaining their names and ABI. Keep the original bundled FastDeploy, ONNX Runtime, OpenCV and Dawn dependencies.
-
-For this exact build, the CMake outputs contain absolute development RPATHs. Remove them from the copied replacements, then sign the changed libraries and app locally:
-
-```sh
-python3 - "$SDK_COPY" "$SDK_BUILD" "$SDK_PREFIX" <<'PY'
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-from tools.macos_bundle import stamp_unsigned_bundle_version
-from tools.sdk_bundle import validate_recognition_bundle
-
-bundle, build, prefix = map(Path, sys.argv[1:])
-root = bundle.resolve(strict=True)
-for name in ("libMaaFramework.dylib", "libMaaUtils.dylib", "libMaaCustomControlUnit.dylib"):
-    target = (bundle / "Contents/Resources/maa/bin" / name).resolve(strict=True)
-    if target.relative_to(root).as_posix() != f"Contents/Frameworks/maa/bin/{name}":
-        raise SystemExit("Replacement target is not the expected physical bundle library.")
-    shutil.copyfile(build / "bin" / name, target)
-    subprocess.run(["install_name_tool", "-delete_rpath", str(prefix / "vcpkg/installed/maa-arm64-osx/lib"), str(target)], check=True)
-    if name == "libMaaFramework.dylib":
-        subprocess.run(["install_name_tool", "-delete_rpath", str(build / "bin"), str(target)], check=True)
-    subprocess.run(["codesign", "--force", "--sign", "-", str(target)], check=True)
-validate_recognition_bundle(bundle, "darwin")
-stamp_unsigned_bundle_version(bundle, "0.2.0")
-PY
-```
-
-For each copied dylib, require `lipo -archs` to report arm64, inspect `otool -L`, and require `otool -l` RPATHs to contain only `@loader_path` and `@executable_path`. Verify the marker with `nm -gU`. `codesign --verify --deep --strict "$SDK_COPY"` must pass. Ad-hoc signing is a local test step; it provides no notarization, production trust or permission grant, and may change the executable's signature bytes.
-
-Run the frozen synthetic checks:
-
-```sh
-"$SDK_COPY/Contents/MacOS/AFKGrinder" --sdk-check
-"$SDK_COPY/Contents/MacOS/AFKGrinder" --ui-smoke
-```
-
-For loader-path evidence, invoke the frozen `--sdk-worker --sdk-report NEW_REPORT_PATH` directly with `DYLD_PRINT_LIBRARIES=1` after removing inherited `DYLD_*` overrides and `MAAFW_BINARY_PATH`. The outer `--sdk-check` captures its child's stderr; tracing only the outer process misses the SDK loads. Require all three replacement libraries and the four bundled dependencies to load from the private copy, with no development SDK path. Keep trace output local. The worker is synthetic, CPU-only, and disables native input and SDK image/log persistence. The UI smoke uses a fake backend and synthetic OCR; no Screen Recording or input permissions are needed.
-
-## Recorded evidence and remaining work
-
-October 20, 2026: real retrieval verified all four pinned archives and 15,176 source files. The manually assembled native build inputs were compared against those same archives; the only changed archived file was the documented probe source. CMake built all three libraries. A separate copy of private app source `bc35b6c` loaded the marker and reported native SDK 5.14.3, passed frozen SDK checks, synthetic OCR and 28 layout checks, and passed ad-hoc deep strict verification. Dynamic loader output identified all seven SDK libraries inside the copy. No game input, capture or recording ran; the live test app was not replaced.
-
-The source fetcher and race fix received fresh OpenAI Terra-xhigh read-only review. An independent OpenAI Luna reader verified actual replacement hashes, internal aliases, arm64, RPATHs, marker export, signatures and current-app identity. Runtime OCR/loader results remain controller-produced evidence rather than an independent native rerun. Local receipts are `/private/tmp/afk-grinder-sdk-rebuild/SOURCE_PREPARATION_VERIFICATION.json` and `REPLACEMENT_VERIFICATION.json`; no binaries, archives or user screenshots are committed.
-
-This proves one compatible private arm64 modification and retrieval/build route. It does not prove arbitrary ABI changes, complete dependency source access, Windows/Intel replacement, signed distribution, installation, gameplay or final license compliance. All SDK-bearing publication and release gates remain closed.
+Current private candidate `bc35b6c` and calibration app remain unchanged. Screen Recording approval, native gameplay/calibration evidence, complete corresponding-source and license review, signed distribution, installation and release gates remain open. SDK-bearing publication remains blocked.
