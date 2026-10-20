@@ -1,11 +1,12 @@
 """Trusted-shell API boundaries with no WebView or native backend."""
 
+import io
 import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from afk_grinder.desktop_app import (DesktopAPI, _document_failure, _schedule_interface_scale,
+from afk_grinder.desktop_app import (DesktopAPI, _document_failure, _schedule_interface_scale, _smoke_resize,
                                     allowed_document, open_desktop, restricted_dispatch)
 
 
@@ -25,6 +26,41 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_smoke_resize_caps_to_host_and_reports_actual_client_width(self):
+        window = Mock()
+        window.evaluate_js.side_effect = [1024, 1008]
+        output = io.StringIO()
+        with patch('afk_grinder.desktop_app.sys.stdout', output):
+            self.assertEqual(_smoke_resize(window, 1180, 800), 1008)
+        window.resize.assert_called_once_with(1024, 800)
+        self.assertEqual(output.getvalue(),
+                         'Launcher smoke viewport: requested=1180 available=1024 target=1024 actual=1008.\n')
+
+    def test_smoke_resize_preserves_request_on_larger_display(self):
+        window = Mock()
+        window.evaluate_js.side_effect = [3840, 1180]
+        with patch('afk_grinder.desktop_app.sys.stdout', None):
+            self.assertEqual(_smoke_resize(window, 1180, 800), 1180)
+        window.resize.assert_called_once_with(1180, 800)
+
+    def test_smoke_resize_rejects_unknown_or_unsupported_display_before_resize(self):
+        for value in (None, True, '1024', 619, 32769, float('nan'), float('inf')):
+            with self.subTest(value=value):
+                window = Mock()
+                window.evaluate_js.return_value = value
+                with self.assertRaisesRegex(RuntimeError, 'screen bounds are unavailable'):
+                    _smoke_resize(window, 1180, 800)
+                window.resize.assert_not_called()
+
+    def test_smoke_resize_still_fails_when_window_does_not_reach_capped_width(self):
+        window = Mock()
+        window.evaluate_js.side_effect = [1024, 900]
+        with patch('afk_grinder.desktop_app.time.monotonic', side_effect=[0, 0.1, 2.1]), \
+             patch('afk_grinder.desktop_app.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'resize failed'):
+                _smoke_resize(window, 1180, 800)
+        window.resize.assert_called_once_with(1024, 800)
+
     def test_interface_scale_validates_and_uses_native_ui_thread(self):
         window = SimpleNamespace(uid='test')
         native = Mock()
