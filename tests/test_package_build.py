@@ -58,7 +58,7 @@ class PackageBuildTests(unittest.TestCase):
             self.assertIn("AFKGrinder/AFKGrinder.exe", packaged.namelist())
             self.assertIn("AFKGrinder/_internal/runtime.dat", packaged.namelist())
             self.assertIn("BUILD_INFO.json", packaged.namelist())
-            self.assertEqual(packaged.read("LICENSE"), b"test project license\n")
+            self.assertEqual(packaged.read("LICENSE"), (self.root / "LICENSE").read_bytes())
             self.assertIn("THIRD_PARTY_NOTICES.md", packaged.namelist())
             self.assertIn("licenses/runtime.txt", packaged.namelist())
             metadata = json.loads(packaged.read("BUILD_INFO.json"))
@@ -197,6 +197,14 @@ class PackageBuildTests(unittest.TestCase):
             archive.writestr("maa/resource.pyc", b"not executable in this test")
         with self.assertRaisesRegex(ValueError, "distribution gate"):
             package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+
+    def test_retained_upstream_notice_hashes_match_on_this_platform(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "licenses" / "provenance.json").read_text(encoding="utf-8"))
+        for record in manifest["files"]:
+            with self.subTest(notice=record["file"]):
+                self.assertEqual(hashlib.sha256((root / "licenses" / record["file"]).read_bytes()).hexdigest(),
+                                 record["sha256"])
 
 
 if __name__ == "__main__":

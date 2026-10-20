@@ -1,0 +1,3 @@
+# Preserve the owner's blueprint and upstream notice bytes on every checkout.
+BUILD.md -text
+licenses/** -text
