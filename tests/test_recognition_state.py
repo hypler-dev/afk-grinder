@@ -16,7 +16,7 @@ import zlib
 
 from afk_grinder.models import Target
 from afk_grinder.recognition.observation import Layout, Observation, Rect
-from afk_grinder.recognition.packs import load_pack
+from afk_grinder.recognition.packs import State, load_pack
 from afk_grinder.recognition.state import StateInspector
 
 
@@ -62,8 +62,17 @@ def _pack(anchors: dict[str, float], states: list[dict[str, object]]):
         directory.cleanup()
 
 
-def _state(state_id: str, positive: list[str], exclude: list[str] | None = None, stable_frames: int = 2) -> dict[str, object]:
-    return {"id": state_id, "positive": positive, "exclude": exclude or [], "stable_frames": stable_frames}
+def _state(
+    state_id: str,
+    positive: list[str],
+    exclude: list[str] | None = None,
+    stable_frames: int = 2,
+    kind: str | None = None,
+) -> dict[str, object]:
+    state = {"id": state_id, "positive": positive, "exclude": exclude or [], "stable_frames": stable_frames}
+    if kind is not None:
+        state["kind"] = kind
+    return state
 
 
 class StateInspectorTests(unittest.TestCase):
@@ -91,6 +100,60 @@ class StateInspectorTests(unittest.TestCase):
             ("known", "ready", "stable", 3),
             ("known", "ready", "stable", 3),
         ])
+
+    def test_stable_state_kinds_gate_results_without_action_permission(self):
+        expected = {
+            "unclassified": ("known", "stable"),
+            "gameplay": ("known", "stable"),
+            "popup": ("blocked", "popup"),
+            "transaction": ("blocked", "transaction"),
+            "loading": ("blocked", "loading"),
+            "disconnected": ("blocked", "disconnected"),
+            "unknown": ("unknown", "unknown_screen"),
+        }
+        for kind, (status, reason) in expected.items():
+            with self.subTest(kind=kind):
+                inspector = StateInspector(_pack({"a": 0.8}, [_state(kind, ["a"], kind=kind)]))
+                first = self.inspect(inspector, 1, {"a": 0.8})
+                second = self.inspect(inspector, 2, {"a": 0.8})
+                self.assertEqual((first.status, first.state_id, first.kind, first.reason), ("unknown", None, None, "unstable"))
+                self.assertEqual(
+                    (second.status, second.state_id, second.kind, second.reason, second.stable_frames),
+                    (status, kind, kind, reason, 2),
+                )
+
+    def test_popup_gameplay_ambiguity_and_exclusion_clear_identity(self):
+        ambiguous = _pack({"popup": 0.8, "gameplay": 0.8}, [
+            _state("popup", ["popup"], kind="popup"),
+            _state("gameplay", ["gameplay"], kind="gameplay"),
+        ])
+        result = self.inspect(StateInspector(ambiguous), 1, {"popup": 0.8, "gameplay": 0.8})
+        self.assertEqual((result.status, result.state_id, result.kind, result.reason), ("unknown", None, None, "ambiguous"))
+
+        excluded = _pack({"popup": 0.8, "gameplay": 0.8}, [
+            _state("popup", ["popup"], ["gameplay"], kind="popup"),
+            _state("gameplay", ["gameplay"], kind="gameplay"),
+        ])
+        result = self.inspect(StateInspector(excluded), 1, {"popup": 0.8, "gameplay": 0.8})
+        self.assertEqual((result.status, result.state_id, result.kind, result.reason, result.stable_frames), ("blocked", None, None, "excluded", 0))
+
+    def test_stale_replay_and_gap_reset_popup_stability(self):
+        inspector = StateInspector(_pack({"popup": 0.8}, [_state("dialog", ["popup"], kind="popup")]))
+        self.assertEqual(self.inspect(inspector, 1, {"popup": 0.8}).stable_frames, 1)
+        stale = inspector.inspect(self.observation(2, 0.2), {"popup": 0.8}, now=0.700001)
+        self.assertEqual((stale.status, stale.state_id, stale.kind, stale.reason, stale.stable_frames), ("unknown", None, None, "stale", 0))
+        self.assertEqual(self.inspect(inspector, 3, {"popup": 0.8}).stable_frames, 1)
+        replay = inspector.inspect(self.observation(3), {"popup": 0.8}, now=0.4)
+        self.assertEqual((replay.status, replay.state_id, replay.kind, replay.reason, replay.stable_frames), ("unknown", None, None, "out_of_order", 0))
+        self.assertEqual(self.inspect(inspector, 4, {"popup": 0.8}).stable_frames, 1)
+        gap = self.inspect(inspector, 6, {"popup": 0.8})
+        self.assertEqual((gap.status, gap.state_id, gap.kind, gap.reason, gap.stable_frames), ("unknown", None, None, "unstable", 1))
+
+    def test_manually_constructed_unsupported_kind_fails_closed(self):
+        pack = _pack({"a": 0.8}, [_state("ready", ["a"])])
+        invalid = replace(pack, states=(State("ready", ("a",), (), 2, "unsupported"),))
+        result = self.inspect(StateInspector(invalid), 1, {"a": 0.8})
+        self.assertEqual((result.status, result.state_id, result.kind, result.reason, result.stable_frames), ("unknown", None, None, "invalid_state_kind", 0))
 
     def test_threshold_and_missing_are_distinct_from_evaluated_negative(self):
         pack = _pack({"a": 0.8, "b": 0.7}, [_state("ready", ["a"], ["b"])])

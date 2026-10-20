@@ -57,6 +57,9 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _REVISION_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 _LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+SUPPORTED_STATE_KINDS: Final = frozenset({
+    "unclassified", "gameplay", "popup", "transaction", "loading", "disconnected", "unknown",
+})
 
 
 class PackError(ValueError):
@@ -101,6 +104,7 @@ class State:
     positive: tuple[str, ...]
     exclude: tuple[str, ...]
     stable_frames: int
+    kind: str = "unclassified"
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,7 +545,8 @@ def _states(value: Any, anchors: tuple[Anchor, ...]) -> tuple[State, ...]:
     result: list[State] = []
     seen: set[str] = set()
     for index, raw in enumerate(items):
-        item = _keys(raw, {"id", "positive", "exclude", "stable_frames"}, f"states[{index}]")
+        label = f"states[{index}]"
+        item = _optional_keys(raw, {"id", "positive", "exclude", "stable_frames"}, {"kind"}, label)
         state_id = _id(item["id"], f"states[{index}].id")
         positive = _references(item["positive"], f"states[{index}].positive", anchor_ids, nonempty=True)
         exclude = _references(item["exclude"], f"states[{index}].exclude", anchor_ids, nonempty=False)
@@ -553,8 +558,22 @@ def _states(value: Any, anchors: tuple[Anchor, ...]) -> tuple[State, ...]:
         if state_id in seen:
             raise PackError("state IDs must be unique")
         seen.add(state_id)
-        result.append(State(state_id, positive, exclude, stable_frames))
+        kind = "unclassified" if "kind" not in item else _state_kind(item["kind"], f"{label}.kind")
+        result.append(State(state_id, positive, exclude, stable_frames, kind))
     return tuple(result)
+
+
+def _optional_keys(value: Any, required: set[str], optional: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or not required <= set(value) or not set(value) <= required | optional:
+        raise PackError(f"{label} has missing or unknown fields")
+    return value
+
+
+def _state_kind(value: Any, label: str) -> str:
+    kind = _text(value, label, 16, ascii_only=True)
+    if kind not in SUPPORTED_STATE_KINDS:
+        raise PackError(f"{label} is not supported")
+    return kind
 
 
 def _asset_path(value: Any) -> str:

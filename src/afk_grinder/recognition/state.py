@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import math
 
 from afk_grinder.recognition.observation import Layout, Observation
-from afk_grinder.recognition.packs import ResourcePack, State
+from afk_grinder.recognition.packs import ResourcePack, SUPPORTED_STATE_KINDS, State
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +19,8 @@ class StateInspection:
     """One fail-closed interpretation of a single observation.
 
     ``state_id`` is present only for a temporally stable, unique candidate.
+    ``kind`` is present only with that stable identity.  A stable ``unknown``
+    kind is a unique supported unknown-screen class; it never permits action.
     ``stable_frames`` may show progress for an otherwise unknown result.
     """
 
@@ -26,6 +28,7 @@ class StateInspection:
     state_id: str | None
     reason: str
     stable_frames: int
+    kind: str | None = None
 
 
 class StateInspector:
@@ -114,6 +117,8 @@ class StateInspector:
         return score >= self._thresholds[anchor_id]
 
     def _candidate(self, state: State, observation: Observation) -> StateInspection:
+        if type(state.kind) is not str or state.kind not in SUPPORTED_STATE_KINDS:
+            return self._unknown("invalid_state_kind")
         consecutive = (self._last_candidate == state.id
                        and self._last_layout == observation.layout
                        and self._last_generation == observation.generation
@@ -125,7 +130,11 @@ class StateInspector:
         self._last_generation = observation.generation
         self._last_sequence = observation.sequence
         if self._stable_frames >= state.stable_frames:
-            return StateInspection("known", state.id, "stable", self._stable_frames)
+            if state.kind in {"unclassified", "gameplay"}:
+                return StateInspection("known", state.id, "stable", self._stable_frames, state.kind)
+            if state.kind == "unknown":
+                return StateInspection("unknown", state.id, "unknown_screen", self._stable_frames, state.kind)
+            return StateInspection("blocked", state.id, state.kind, self._stable_frames, state.kind)
         return StateInspection("unknown", None, "unstable", self._stable_frames)
 
     def _blocked(self) -> StateInspection:

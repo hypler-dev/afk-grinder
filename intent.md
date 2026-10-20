@@ -27,6 +27,8 @@ The owner subsequently instructed “we need to autobind” and approved using t
 
 The owner additionally requested scaling for the accepted launcher. Support small and large desktop windows, HiDPI displays and 200% interface zoom while retaining visible emergency Stop, reachable navigation and controls, readable wrapped statuses and source-pixel preview geometry. Window or interface scaling must not change the selected source area, arm input or clear safety state.
 
+The owner additionally requested handling in-game popups after reward overlays interrupted supervised tests. Popup recognition and responses belong to reviewed game profiles. The first increment adds offline state categories and explicit blocking outcomes; it does not detect or dismiss a real popup. Future dismissal requires fresh calibrated evidence, an approved non-transaction target, bounded attempts, and verification that the overlay disappeared before fresh state discovery. Unknown overlays and purchase/trade interfaces block actions. Do not use generic blind clicks or Escape presses to clear arbitrary screens, and do not automate reward claims or transactions.
+
 ## Users and systems
 
 - Owner and initial user: Jeff.

@@ -119,6 +119,40 @@ class PackLoaderTests(unittest.TestCase):
         self.assertIsInstance(pack.assets[0].data, bytes)
         self.assertEqual(pack.states[0].positive, ("hud.anchor",))
 
+    def test_state_kind_is_optional_and_strict(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload, files = self.asset_manifest()
+            self.write_pack(root, payload, files)
+            self.assertEqual(load_pack(root).states[0].kind, "unclassified")
+
+        for kind in ("unclassified", "gameplay", "popup", "transaction", "loading", "disconnected", "unknown"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                payload, files = self.asset_manifest()
+                payload["states"][0]["kind"] = kind
+                self.write_pack(root, payload, files)
+                self.assertEqual(load_pack(root).states[0].kind, kind)
+
+        invalid = (None, True, 1, "Popup", "unsupported")
+        for kind in invalid:
+            with self.subTest(kind=repr(kind)), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                payload, files = self.asset_manifest()
+                payload["states"][0]["kind"] = kind
+                self.write_pack(root, payload, files)
+                with self.assertRaises(PackError):
+                    load_pack(root)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload, files = self.asset_manifest()
+            payload["states"][0]["kind"] = "popup"
+            payload["states"][0]["unexpected"] = True
+            self.write_pack(root, payload, files)
+            with self.assertRaises(PackError):
+                load_pack(root)
+
     def test_tamper_hash_and_png_header_fail(self):
         for contents, label, matching_hash in ((b"tampered", "hash", False), (b"not-a-png", "header", True), (png(4001, 4000, b""), "bomb", True)):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
