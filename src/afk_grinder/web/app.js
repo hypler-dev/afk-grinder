@@ -10,9 +10,9 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const CAPTURE_CODES = new Set(['permission', 'window_count', 'window_missing', 'geometry', 'black_frame', 'timeout', 'conversion', 'unavailable', 'unexpected']);
-  const CAPTURE_STAGES = new Set(['initialization', 'preflight', 'discovery', 'window_selection', 'filter_geometry', 'display_selection', 'screenshot', 'pixel_conversion', 'frame_validation', 'worker']);
+  const CAPTURE_STAGES = new Set(['initialization', 'preflight', 'discovery', 'window_selection', 'filter_geometry', 'display_selection', 'screenshot', 'pixel_conversion', 'frame_validation', 'worker', 'ipc_read', 'worker_exit', 'worker_deadline', 'preview_geometry', 'preview_encoding']);
   const CAPTURE_ERROR_TYPES = new Set(['capture_error', 'attribute_error', 'type_error', 'value_error', 'runtime_error', 'timeout_error', 'unexpected']);
-  const model = { state: null, route: 'library', bridgeReady: false, polling: false, previewRequestId: 0, previewGameId: null, image: null, imageId: null, draftArea: null, pendingArea: null, pointer: null, gamesKey: '', candidatesKey: '' };
+  const model = { state: null, route: 'library', bridgeReady: false, polling: false, previewRequestId: 0, previewGameId: null, image: null, imageId: null, draftArea: null, pendingArea: null, pointer: null, gamesKey: '', candidatesKey: '', roiDrawId: 0, roiObserver: null };
 
   function bridge() { return window.pywebview && window.pywebview.api; }
   function say(message) { $('#announcer').textContent = message || ''; }
@@ -114,13 +114,40 @@
 
   function sameArea(first, second) { return first && second && first.x === second.x && first.y === second.y && first.width === second.width && first.height === second.height; }
   function previewRect() { const preview = model.state && model.state.preview; return model.draftArea || (preview && preview.area); }
-  function canvasMetrics() { const canvas = $('#roi-canvas'); const preview = model.state && model.state.preview; if (!model.image || !preview || !preview.width || !preview.height) return null; const maxWidth = Math.min(canvas.parentElement.clientWidth - 2, preview.width); const maxHeight = 420; const scale = Math.min(maxWidth / preview.width, maxHeight / preview.height); return { canvas, preview, width: Math.max(1, Math.round(preview.width * scale)), height: Math.max(1, Math.round(preview.height * scale)), scale }; }
-  function drawRoi() { const metrics = canvasMetrics(); const canvas = $('#roi-canvas'); const empty = $('#roi-empty'); if (!metrics) { canvas.width = 0; canvas.height = 0; canvas.hidden = true; empty.hidden = false; return; } empty.hidden = true; canvas.hidden = false; canvas.width = metrics.width; canvas.height = metrics.height; const context = canvas.getContext('2d'); const image = new Image(); const source = model.image; image.onload = () => { if (source !== model.image) return; context.drawImage(image, 0, 0, metrics.width, metrics.height); const area = previewRect(); if (!area) return; context.lineWidth = 2; context.strokeStyle = '#50dbf7'; context.fillStyle = '#50dbf722'; context.fillRect(area.x * metrics.scale, area.y * metrics.scale, area.width * metrics.scale, area.height * metrics.scale); context.strokeRect(area.x * metrics.scale, area.y * metrics.scale, area.width * metrics.scale, area.height * metrics.scale); }; image.src = source; }
+  function canvasMetrics() {
+    const canvas = $('#roi-canvas'); const preview = model.state && model.state.preview;
+    if (!model.image || !preview || !preview.width || !preview.height) return null;
+    const maxWidth = Math.min(Math.max(1, canvas.parentElement.clientWidth - 14), preview.width);
+    const scale = Math.min(maxWidth / preview.width, 420 / preview.height);
+    const width = Math.max(1, Math.round(preview.width * scale)); const height = Math.max(1, Math.round(preview.height * scale));
+    return { canvas, preview, width, height, xScale: width / preview.width, yScale: height / preview.height, dpr: Math.max(1, window.devicePixelRatio || 1) };
+  }
+  function drawRoi() {
+    const metrics = canvasMetrics(); const canvas = $('#roi-canvas'); const empty = $('#roi-empty'); const drawId = ++model.roiDrawId;
+    if (!metrics) { canvas.width = 0; canvas.height = 0; canvas.hidden = true; empty.hidden = false; return; }
+    empty.hidden = true; canvas.hidden = false;
+    canvas.style.width = `${metrics.width}px`; canvas.style.height = `${metrics.height}px`;
+    canvas.width = Math.round(metrics.width * metrics.dpr); canvas.height = Math.round(metrics.height * metrics.dpr);
+    const context = canvas.getContext('2d'); context.setTransform(metrics.dpr, 0, 0, metrics.dpr, 0, 0);
+    const image = new Image(); const source = model.image;
+    image.onload = () => {
+      if (drawId !== model.roiDrawId || source !== model.image) return;
+      context.clearRect(0, 0, metrics.width, metrics.height); context.drawImage(image, 0, 0, metrics.width, metrics.height);
+      const area = previewRect(); if (!area) return;
+      const x = area.x * metrics.xScale; const y = area.y * metrics.yScale; const width = area.width * metrics.xScale; const height = area.height * metrics.yScale;
+      context.lineWidth = 2; context.strokeStyle = '#50dbf7'; context.fillStyle = '#50dbf722'; context.fillRect(x, y, width, height); context.strokeRect(x, y, width, height);
+    };
+    image.src = source;
+  }
   function centeredArea() { const preview = model.state.preview; const maximum = Math.min(preview.width, Math.floor(preview.height * 16 / 9)); const width = Math.max(16, Math.floor(maximum / 16) * 16); const height = width / 16 * 9; return { x: Math.max(0, Math.round((preview.width - width) / 2)), y: Math.max(0, Math.round((preview.height - height) / 2)), width, height }; }
   function clampArea(area) { const preview = model.state.preview; const maximum = Math.min(preview.width, Math.floor(preview.height * 16 / 9)); const width = Math.max(16, Math.min(Math.floor(maximum / 16) * 16, Math.floor(Math.round(area.width) / 16) * 16)); const height = width / 16 * 9; return { x: Math.max(0, Math.min(preview.width - width, Math.round(area.x))), y: Math.max(0, Math.min(preview.height - height, Math.round(area.y))), width, height }; }
   function setDraft(area) { model.draftArea = clampArea(area); drawRoi(); }
   function submitArea() { const preview = model.state && model.state.preview; const area = previewRect(); if (!canEditArea() || !preview || !preview.id || !area) return; model.pendingArea = { ...area }; call('set_area', { preview_id: preview.id, rect: area }); }
-  function areaFromPointer(event) { const metrics = canvasMetrics(); if (!metrics) return null; const bounds = metrics.canvas.getBoundingClientRect(); return { x: Math.round((event.clientX - bounds.left) / metrics.scale), y: Math.round((event.clientY - bounds.top) / metrics.scale) }; }
+  function areaFromPointer(event) {
+    const metrics = canvasMetrics(); if (!metrics) return null;
+    const bounds = metrics.canvas.getBoundingClientRect(); if (!bounds.width || !bounds.height) return null;
+    return { x: Math.round((event.clientX - bounds.left) * metrics.preview.width / bounds.width), y: Math.round((event.clientY - bounds.top) * metrics.preview.height / bounds.height) };
+  }
 
   document.addEventListener('click', (event) => { const routeButton = event.target.closest('[data-route]'); if (routeButton) { route(routeButton.dataset.route); return; } const commandButton = event.target.closest('[data-command]'); if (commandButton && !commandButton.disabled) { if (commandButton.dataset.command === 'reset_area' || commandButton.dataset.command === 'clear_preview') model.draftArea = null; call(commandButton.dataset.command); } });
   $$('.mode-group button').forEach((button) => button.addEventListener('click', () => call('set_mode', { mode: button.dataset.mode })));
@@ -133,6 +160,8 @@
   $('#roi-canvas').addEventListener('keydown', (event) => { const preview = model.state && model.state.preview; if (!preview || !canEditArea()) return; let area = previewRect(); if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDraft(centeredArea()); submitArea(); return; } if (event.key.toLowerCase() === 'r') { event.preventDefault(); model.draftArea = null; call('reset_area'); return; } if (!event.key.startsWith('Arrow')) return; event.preventDefault(); area = area || centeredArea(); const delta = event.shiftKey ? 16 : 1; if (event.key === 'ArrowLeft') area = event.shiftKey ? { ...area, width: area.width - delta, height: Math.round((area.width - delta) * 9 / 16) } : { ...area, x: area.x - delta }; if (event.key === 'ArrowRight') area = event.shiftKey ? { ...area, width: area.width + delta, height: Math.round((area.width + delta) * 9 / 16) } : { ...area, x: area.x + delta }; if (event.key === 'ArrowUp') area = event.shiftKey ? { ...area, height: area.height - 9, width: Math.round((area.height - 9) * 16 / 9) } : { ...area, y: area.y - delta }; if (event.key === 'ArrowDown') area = event.shiftKey ? { ...area, height: area.height + 9, width: Math.round((area.height + 9) * 16 / 9) } : { ...area, y: area.y + delta }; setDraft(area); submitArea(); });
   window.addEventListener('keydown', (event) => { const shortcut = event.metaKey || event.ctrlKey; if (event.key === 'Escape' || (shortcut && event.key === '.')) { event.preventDefault(); call('stop'); } else if (shortcut && event.key === ',') { event.preventDefault(); route('settings'); } });
   window.addEventListener('resize', drawRoi);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', drawRoi);
+  if (window.ResizeObserver) { model.roiObserver = new ResizeObserver(() => drawRoi()); model.roiObserver.observe($('#roi-canvas').parentElement); }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
   route('library'); render(); poll(); window.setInterval(poll, POLL_MS);
 })();

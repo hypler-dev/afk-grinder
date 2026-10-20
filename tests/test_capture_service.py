@@ -130,6 +130,9 @@ class CaptureServiceTests(unittest.TestCase):
         result = job.poll()
         self.assertIn("timed out", result.error)
         self.assertIsNone(result.report)
+        self.assertEqual(result.diagnostic.as_ipc(), {
+            "code": "timeout", "stage": "worker_deadline", "error_type": "timeout_error",
+        })
         self.assertIsNone(job.poll())
 
     def test_malformed_or_oversized_ipc_and_unexpected_operation_rejected(self):
@@ -208,7 +211,20 @@ class CaptureServiceTests(unittest.TestCase):
         process.exitcode = 1
         job = BackgroundJob("sdk", _context=context)
         job._thread.join(timeout=1)
-        self.assertTrue(job.poll().error)
+        result = job.poll()
+        self.assertTrue(result.error)
+        self.assertEqual(result.diagnostic.stage, "worker_exit")
+        self.assertEqual(result.diagnostic.error_type, "runtime_error")
+
+    def test_ipc_decode_failure_has_safe_parent_stage(self):
+        context, _, _, _ = self.context([])
+        job = BackgroundJob("capture", TARGET, _context=context)
+        job._thread.join(timeout=1)
+        result = job.poll()
+        self.assertTrue(result.error)
+        self.assertEqual(result.diagnostic.as_ipc(), {
+            "code": "unexpected", "stage": "ipc_read", "error_type": "unexpected",
+        })
 
     def test_process_start_failure_closes_both_pipes(self):
         context, reader, writer, process = self.context([])

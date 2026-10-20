@@ -142,6 +142,49 @@ class DesktopControllerTests(unittest.TestCase):
         self.assertIsNone(controller._tracker.latest)
         self.assertIsNone(controller._tracker.calibration)
 
+    def test_preview_preparation_errors_have_safe_stage_and_drop_pixels(self) -> None:
+        for operation, stage in (("layout_from_capture", "preview_geometry"),
+                                 ("_encode_preview_async", "preview_encoding")):
+            with self.subTest(operation=operation):
+                controller = self.make_controller((TARGET_ONE,))
+                controller.command("capture", {})
+                self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+                target = ("afk_grinder.desktop_controller.layout_from_capture" if operation == "layout_from_capture"
+                          else "afk_grinder.desktop_controller.DesktopController._encode_preview_async")
+                with patch(target, side_effect=ValueError("/private/person/window-title")):
+                    preview = controller.get_state()["preview"]
+                self.assertEqual(preview["phase"], "error")
+                self.assertEqual(preview["error"]["stage"], stage)
+                self.assertEqual(preview["error"]["error_type"], "value_error")
+                self.assertNotIn("/private", str(preview))
+                self.assertIsNone(controller._preview_frame)
+                self.assertIsNone(controller._preview_layout)
+                self.assertIsNone(controller._tracker.latest)
+
+    def test_async_encoder_failure_drops_preview_and_geometry(self) -> None:
+        class ImmediateThread:
+            def __init__(self, *, target, **kwargs):
+                self.target = target
+
+            def start(self):
+                self.target()
+
+        controller = self.make_controller((TARGET_ONE,))
+        controller.command("capture", {})
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        with patch("afk_grinder.desktop_controller.threading.Thread", ImmediateThread), \
+             patch("afk_grinder.desktop_controller._png_data_url", side_effect=ValueError("/private/person/window")):
+            controller.get_state()
+            preview = controller.get_state()["preview"]
+        self.assertEqual(preview["phase"], "error")
+        self.assertEqual(preview["error"]["code"], "conversion")
+        self.assertEqual(preview["error"]["stage"], "preview_encoding")
+        self.assertNotIn("/private", str(preview))
+        self.assertIsNone(controller._preview_frame)
+        self.assertIsNone(controller._preview_layout)
+        self.assertIsNone(controller._preview_png)
+        self.assertIsNone(controller._tracker.latest)
+
     def test_expired_match_keeps_editable_image_but_invalidates_observation(self) -> None:
         controller = self.make_controller((TARGET_ONE,))
         preview_id = self.capture_reference(controller)

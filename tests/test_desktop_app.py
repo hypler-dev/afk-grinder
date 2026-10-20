@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from afk_grinder.desktop_app import DesktopAPI, _document_failure, allowed_document, open_desktop, restricted_dispatch
+from afk_grinder.desktop_app import (DesktopAPI, _document_failure, _schedule_interface_scale,
+                                    allowed_document, open_desktop, restricted_dispatch)
 
 
 class FakeController:
@@ -24,6 +25,49 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_interface_scale_validates_and_uses_native_ui_thread(self):
+        window = SimpleNamespace(uid='test')
+        native = Mock()
+        callbacks = []
+        closed = threading.Event()
+        cocoa = SimpleNamespace(BrowserView=SimpleNamespace(instances={'test': SimpleNamespace(webview=native)}))
+        app_helper = SimpleNamespace(callAfter=callbacks.append)
+        with patch.dict('sys.modules', {'webview.platforms.cocoa': cocoa,
+                                       'PyObjCTools': SimpleNamespace(AppHelper=app_helper)}), \
+             patch('afk_grinder.desktop_app.sys.platform', 'darwin'):
+            for value in (True, 0, 99, 201, 150.0, '150'):
+                with self.assertRaises(ValueError):
+                    _schedule_interface_scale(window, value, closed)
+            _schedule_interface_scale(window, 200, closed)
+            native.setPageZoom_.assert_not_called()
+            callbacks.pop()()
+            native.setPageZoom_.assert_called_once_with(2.0)
+            _schedule_interface_scale(window, 125, closed)
+            closed.set()
+            callbacks.pop()()
+            _schedule_interface_scale(window, 150, closed)
+        native.setPageZoom_.assert_called_once()
+        self.assertEqual(callbacks, [])
+
+    def test_windows_interface_scale_is_deferred_and_cancelled_on_close(self):
+        native = Mock()
+        callbacks = []
+        native.BeginInvoke.side_effect = callbacks.append
+        window = SimpleNamespace(native=SimpleNamespace(webview=native))
+        closed = threading.Event()
+        with patch.dict('sys.modules', {'System': SimpleNamespace(Action=lambda action: action)}), \
+             patch('afk_grinder.desktop_app.sys.platform', 'win32'):
+            _schedule_interface_scale(window, 150, closed)
+            self.assertNotIn('ZoomFactor', native.__dict__)
+            callbacks.pop()()
+            self.assertEqual(native.ZoomFactor, 1.5)
+            _schedule_interface_scale(window, 200, closed)
+            closed.set()
+            callbacks.pop()()
+            _schedule_interface_scale(window, 125, closed)
+        self.assertEqual(native.ZoomFactor, 1.5)
+        self.assertEqual(callbacks, [])
+
     def test_close_during_loaded_callback_does_not_fail_or_reopen_bridge(self):
         class Event:
             def __init__(self):
@@ -66,7 +110,8 @@ class ShellBoundaryTests(unittest.TestCase):
             events.loaded.handlers[0]()  # Late duplicate callbacks are ignored.
 
         webview = SimpleNamespace(settings={}, create_window=create_window, start=start)
-        with patch.dict('sys.modules', {'webview': webview}), \
+        menu = SimpleNamespace(Menu=lambda *args: args, MenuAction=lambda *args: args)
+        with patch.dict('sys.modules', {'webview': webview, 'webview.menu': menu}), \
              patch('afk_grinder.desktop_app.sys.platform', 'darwin'), \
              patch('afk_grinder.desktop_app._restrict_bridge'), \
              patch('afk_grinder.desktop_app._install_navigation_guard', return_value=object()), \

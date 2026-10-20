@@ -25,6 +25,8 @@ The owner additionally requested a polished gaming interface on October 20, sele
 
 The owner subsequently instructed “we need to autobind” and approved using the gaming preview as the actual application interface. Integrate that accepted visual direction into the Windows/macOS desktop application using a local bundled web interface, retaining the existing guarded Python input engine. Automatically select a uniquely verified running Roblox target without a foreground-switch countdown; zero targets wait, and ambiguous targets require explicit selection. Automatic binding must never steal focus, arm input, acknowledge gameplay, start a run or resume after interruption. Live Start retains its supervised countdown, foreground checks, manual gameplay acknowledgment and 30-second limit. Expose the application version/source in Settings so older test copies can be distinguished. Capture failures require safe actionable stage/reason diagnostics; native capture acceptance remains open until a real preview succeeds.
 
+The owner additionally requested scaling for the accepted launcher. Support small and large desktop windows, HiDPI displays and 200% interface zoom while retaining visible emergency Stop, reachable navigation and controls, readable wrapped statuses and source-pixel preview geometry. Window or interface scaling must not change the selected source area, arm input or clear safety state.
+
 ## Users and systems
 
 - Owner and initial user: Jeff.

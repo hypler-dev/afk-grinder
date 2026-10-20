@@ -38,6 +38,8 @@ Session phases: `idle`, `countdown`, `running`, `stopping`, `stopped`, `complete
 
 Preview phases: `empty`, `capturing`, `available`, `historical`, `checking`, `error`. Preview errors contain only allowlisted `{code,stage,error_type,message}`. Never expose raw exceptions, NSError descriptions, filenames, other window titles or pixels in diagnostics. Raw Mac window bounds remain unverified after a manual geometry check. `geometry` is `none`, `matched` or `historical`; it never establishes gameplay recognition or permission to act.
 
+Parent-side capture failures distinguish `ipc_read`, `worker_exit` and `worker_deadline`, retaining only allowlisted codes and exception categories. A child frame is never accepted when native teardown exits unsuccessfully or exceeds its deadline. Launcher preparation reports `preview_geometry` or `preview_encoding`; encoding failure clears retained pixels, layout and calibration rather than leaving a usable preview state.
+
 ## Commands
 
 All names and payload keys are allowlisted. Unknown or malformed input is rejected before mutation. Mutations that conflict with active input or cleanup are rejected. Stop is always available and has priority over ordinary mutations.

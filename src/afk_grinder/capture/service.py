@@ -196,16 +196,22 @@ class BackgroundJob:
                 self._results.put_nowait(result)
 
     def _read(self, operation: str, target: Target | None) -> None:
+        stage = "ipc_read"
         try:
             result = _read_result(self._reader, operation, target)
+            stage = "worker_exit"
             # Do not publish success until native destructors have exited too.
             self._process.join(timeout=max(0, self._deadline - time.monotonic()))
             if self._process.is_alive():
                 raise TimeoutError("Observation process did not finish before its deadline.")
             if self._process.exitcode != 0:
                 raise RuntimeError("Observation process exited unsuccessfully.")
-        except Exception:
-            result = JobResult(error="Preview or SDK check failed. No input was sent.")
+        except Exception as error:
+            result = JobResult(error="Preview or SDK check failed. No input was sent.",
+                               diagnostic=CaptureDiagnostic(
+                                   code="timeout" if isinstance(error, TimeoutError) else "unexpected",
+                                   stage=stage, error_type=capture_error_type(error),
+                               ))
         finally:
             self._close_reader()
             if self._process.is_alive():
@@ -226,7 +232,9 @@ class BackgroundJob:
                 return result
             self._finish_locked()
         threading.Thread(target=self._terminate, daemon=True).start()
-        return JobResult(error="Preview or SDK check timed out. No input was sent.")
+        return JobResult(error="Preview or SDK check timed out. No input was sent.",
+                         diagnostic=CaptureDiagnostic(code="timeout", stage="worker_deadline",
+                                                      error_type="timeout_error"))
 
     def _finish_locked(self) -> None:
         self._finished = True

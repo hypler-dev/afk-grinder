@@ -41,6 +41,11 @@ CAPTURE_DIAGNOSTIC_STAGES = frozenset({
     "pixel_conversion",
     "frame_validation",
     "worker",
+    "ipc_read",
+    "worker_exit",
+    "worker_deadline",
+    "preview_geometry",
+    "preview_encoding",
 })
 CAPTURE_DIAGNOSTIC_ERROR_TYPES = frozenset({
     "capture_error",

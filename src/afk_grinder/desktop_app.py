@@ -124,6 +124,42 @@ def _install_navigation_guard(window: Any, expected: str, rejected: Any) -> Any:
     raise RuntimeError("The native launcher supports Windows and macOS only.")
 
 
+def _schedule_interface_scale(window: Any, percent: int, closing: threading.Event) -> None:
+    """Change native page zoom on its UI thread, without changing game state."""
+    if type(percent) is not int or percent not in {100, 125, 150, 175, 200}:
+        raise ValueError("Unsupported interface size.")
+
+    def apply() -> None:
+        if closing.is_set():
+            return
+        try:
+            if sys.platform == "darwin":
+                from webview.platforms.cocoa import BrowserView
+                BrowserView.instances[window.uid].webview.setPageZoom_(percent / 100)
+            elif sys.platform == "win32":
+                window.native.webview.ZoomFactor = percent / 100
+            else:
+                raise RuntimeError("Unsupported native interface.")
+        except Exception:
+            if sys.stderr is not None:
+                print("Interface size could not be changed.", file=sys.stderr)
+
+    if closing.is_set():
+        return
+    try:
+        if sys.platform == "darwin":
+            from PyObjCTools import AppHelper
+            AppHelper.callAfter(apply)
+        elif sys.platform == "win32":
+            from System import Action
+            window.native.webview.BeginInvoke(Action(apply))
+        else:
+            raise RuntimeError("Unsupported native interface.")
+    except Exception:
+        if not closing.is_set() and sys.stderr is not None:
+            print("Interface size could not be changed.", file=sys.stderr)
+
+
 def open_desktop(*, smoke: bool = False) -> None:
     """Run the native launcher, or a no-input bridge/navigation smoke check."""
     if sys.platform not in {"darwin", "win32"}:
@@ -155,7 +191,7 @@ def open_desktop(*, smoke: bool = False) -> None:
         identity += "-dirty"
     window = webview.create_window(f"AFK Grinder {metadata['version']} · {identity}", url=url,
                                    js_api=api, width=1180, height=800, min_size=(620, 450),
-                                   background_color="#090d19", text_select=True)
+                                   background_color="#090d19", text_select=True, zoomable=True)
     guard: list[Any] = []
     failed = threading.Event()
     rejected = threading.Event()
@@ -244,6 +280,13 @@ def open_desktop(*, smoke: bool = False) -> None:
     window.events.closing += closing
     window.events.closed += closed.set
 
+    from webview.menu import Menu, MenuAction
+    menus = [Menu("Interface", [
+        MenuAction(f"{percent}%" + (" (Actual size)" if percent == 100 else ""),
+                   lambda percent=percent: _schedule_interface_scale(window, percent, closing_requested))
+        for percent in (100, 125, 150, 175, 200)
+    ])]
+
     def smoke_check() -> None:
         from .capture.service import BackgroundJob
         job = None
@@ -273,6 +316,47 @@ def open_desktop(*, smoke: bool = False) -> None:
             stage = "ui_state"
             if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
                 raise RuntimeError("Inactive cleanup warning is visible.")
+            for width, height, levels in ((640, 450, (200, 100)), (960, 700, (100,)), (1180, 800, (100,))):
+                stage = f"interface_resize_{width}"
+                window.resize(width, height)
+                resize_deadline = time.monotonic() + 2
+                while time.monotonic() < resize_deadline:
+                    original_width = window.evaluate_js("window.innerWidth")
+                    if isinstance(original_width, (int, float)) and abs(original_width - width) <= 40:
+                        break
+                    time.sleep(0.05)
+                else:
+                    raise RuntimeError("Native interface resize failed.")
+                for percent in levels:
+                    stage = f"interface_scale_{width}_{percent}"
+                    _schedule_interface_scale(window, percent, closing_requested)
+                    scale_deadline = time.monotonic() + 2
+                    while time.monotonic() < scale_deadline:
+                        layout = window.evaluate_js("""(() => {
+                            const stop = document.querySelector('.topbar [data-command="stop"]');
+                            const rect = stop.getBoundingClientRect();
+                            return {width: innerWidth, fit: document.documentElement.scrollWidth <= innerWidth + 1,
+                                stop: rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth + 1 &&
+                                      rect.top >= 0 && rect.bottom <= innerHeight + 1};
+                        })()""")
+                        if (isinstance(layout, dict) and layout.get("fit") and layout.get("stop")
+                                and abs(layout.get("width", 0) * percent / 100 - original_width) <= 3):
+                            break
+                        time.sleep(0.05)
+                    else:
+                        raise RuntimeError("Native interface scaling or Stop layout failed.")
+                    for route in ("library", "session", "setup", "routines", "packs", "settings"):
+                        stage = f"interface_scale_{width}_{percent}_{route}"
+                        selector = json.dumps(f'[data-route="{route}"]')
+                        fits = window.evaluate_js("""(() => {
+                            document.querySelector(""" + selector + """).click();
+                            const stop = document.querySelector('.topbar [data-command="stop"]').getBoundingClientRect();
+                            return document.documentElement.scrollWidth <= innerWidth + 1 &&
+                                stop.width > 0 && stop.left >= 0 && stop.right <= innerWidth + 1 &&
+                                stop.top >= 0 && stop.bottom <= innerHeight + 1;
+                        })()""")
+                        if fits is not True:
+                            raise RuntimeError("Native launcher section overflowed at interface scale.")
             stage = "blocked_navigation"
             rejected.clear()
             blocked_url = entry.with_name("styles.css").resolve().as_uri()
@@ -290,7 +374,7 @@ def open_desktop(*, smoke: bool = False) -> None:
     try:
         webview.start(smoke_check if smoke else None,
                       gui="cocoa" if sys.platform == "darwin" else "edgechromium",
-                      debug=False, http_server=False, private_mode=True)
+                      debug=False, http_server=False, private_mode=True, menu=menus)
     finally:
         controller.close()
     if failed.is_set() or (smoke and not rejected.is_set()):

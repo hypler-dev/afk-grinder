@@ -17,7 +17,7 @@ import time
 from typing import Any, Callable
 import zlib
 
-from afk_grinder.capture import CaptureDiagnostic, CapturedWindow
+from afk_grinder.capture import CaptureDiagnostic, CapturedWindow, capture_error_type
 from afk_grinder.capture.service import BackgroundJob, JobResult
 from afk_grinder.engine import Runner
 from afk_grinder.models import Target, Workflow
@@ -137,7 +137,7 @@ class DesktopController:
         self._preview_frame: CapturedWindow | None = None
         self._preview_layout: Layout | None = None
         self._preview_png: str | None = None
-        self._png_queue: queue.Queue[tuple[int, str | None]] = queue.Queue(maxsize=1)
+        self._png_queue: queue.Queue[tuple[int, str | CaptureDiagnostic]] = queue.Queue(maxsize=1)
         self._sdk_phase = "unchecked"
         self._sdk_message = "Recognition has not been checked."
         self._area: Rect | None = None
@@ -729,6 +729,7 @@ class DesktopController:
             self._preview_frame = None
             self._clear_geometry_locked()
             return job
+        stage = "preview_geometry"
         try:
             layout = layout_from_capture(result.frame)
             if layout.target != context.target:
@@ -755,10 +756,16 @@ class DesktopController:
             self._preview_frame = result.frame
             self._preview_layout = layout
             self._preview_png = None
+            stage = "preview_encoding"
             self._encode_preview_async(self._preview_id, result.frame)
-        except Exception:
+        except Exception as error:
             self._preview_phase = "error"
-            self._preview_error = _safe_diagnostic(None)
+            self._preview_error = _safe_diagnostic(CaptureDiagnostic(
+                code="unexpected", stage=stage, error_type=capture_error_type(error),
+            ))
+            self._preview_frame = None
+            self._preview_layout = None
+            self._preview_png = None
             self._clear_geometry_locked()
         return job
 
@@ -812,8 +819,9 @@ class DesktopController:
         def encode() -> None:
             try:
                 value = _png_data_url(frame)
-            except Exception:
-                value = None
+            except Exception as error:
+                value = CaptureDiagnostic(code="conversion", stage="preview_encoding",
+                                          error_type=capture_error_type(error))
             with self._lock:
                 if self._closing or preview_id != self._preview_id:
                     return
@@ -830,7 +838,16 @@ class DesktopController:
                 preview_id, value = self._png_queue.get_nowait()
             except queue.Empty:
                 return
-            if preview_id == self._preview_id and value is not None:
+            if preview_id != self._preview_id:
+                continue
+            if isinstance(value, CaptureDiagnostic):
+                self._preview_phase = "error"
+                self._preview_error = _safe_diagnostic(value)
+                self._preview_frame = None
+                self._preview_layout = None
+                self._preview_png = None
+                self._clear_geometry_locked()
+            else:
                 self._preview_png = value
 
 
