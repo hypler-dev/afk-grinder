@@ -8,7 +8,7 @@ Last updated: 2026-10-19
 
 ## Scope and protected lanes
 
-Implement a bounded local input prototype with native Windows/macOS focus and Escape checks, then commit/push it and run automated private test-binary builds as explicitly requested. Authentication remains manual. No credential access, network runtime, live Roblox testing, public release publication, or mobile implementation.
+Implement a bounded local input prototype with native Windows/macOS focus and Escape checks, then commit/push it and run automated test-binary builds as explicitly requested. The latest user instruction additionally authorizes public repository visibility/topics, an original README banner, and short supervised Mac Adopt Me control tests after manual login. No credential access, network runtime, unattended grinding, signed/public GitHub release publication, or mobile implementation.
 
 ## Files and ownership
 
@@ -17,6 +17,7 @@ Implement a bounded local input prototype with native Windows/macOS focus and Es
 - UI implementation worker: `src/afk_grinder/ui.py` only, following the separate UI design handoff.
 - Read-only designer and reviewers: exact scoped source and documentation only.
 - Automated build follow-up: controller owns `.github/workflows/build.yml`, documentation, validation, GitHub Actions execution, and commit/push. A bounded native GPT implementation worker owns `tools/package_build.py`, `tools/check_build.py`, and `tests/test_package_build.py`. Fresh independent review covers the exact CI/helper/documentation delta before push.
+- Public/demo follow-up: controller owns README, intent/spec/plan, `docs/MAC_LIVE_TEST.md`, `assets/afk-grinder-banner.png`, `assets/banner-prompt.txt`, workflow artifact-step wording, GitHub visibility/topics, and supervised testing. No worker receives live game screenshots or account data.
 
 Final changed paths (all relative to the repository root):
 
@@ -48,6 +49,9 @@ tools/smoke_ui.py
 tools/check_build.py
 tools/package_build.py
 tests/test_package_build.py
+docs/MAC_LIVE_TEST.md
+assets/afk-grinder-banner.png
+assets/banner-prompt.txt
 ```
 
 ## Sequence
@@ -97,7 +101,7 @@ None at plan creation. Python/Tk is the bounded proof-of-input prototype; Tauri 
 - Controller: native GPT/Sol (OpenAI). Design: `gpt_ui_design`; adapters/UI: `gpt_worker`; independent safety review: `gpt_reviewer`; UI/accessibility/QA/performance review: `gpt_ui_review` (OpenAI Terra roles). GLM unused; no GLM contact attempted, no provider errors or fallback.
 - Initial independent code review found no engine/adapter defects; requested completed evidence ledger and two meaningful regression tests. Both tests now pass. Final independent safety follow-up: PASS, no actionable P1/P2/P3 findings. UI/accessibility/QA/performance review: PASS with assistive-technology and platform hardware gates explicitly open; native Quit callback and main-loop cleanup were added before that final review.
 - Remaining gates: real Roblox input acceptance, focus loss, Escape, Stop, and quit on each platform; representative player hardware and minimum OS coverage; clean-machine packaged permissions and install/uninstall; accessibility with assistive technology; installer creation, signing/notarization, and separately authorized public release. The automated build follow-up below closes native build/startup coverage for Windows x64 and Mac arm64/x64.
-- Original prototype handoff: no live game input, login, account access, screenshot capture by the application, deployment, or release publication occurred. At that snapshot no prototype commit or push had been requested or performed. The subsequent October 19 instruction authorizes commit/push and private CI test artifacts. Repository remains private `hypler-dev/afk-grinder`; bootstrap HEAD was `25ff352`.
+- Original prototype handoff: no live game input, login, account access, screenshot capture by the application, deployment, or release publication occurred. At that snapshot no prototype commit or push had been requested or performed. The subsequent October 19 instruction authorizes commit/push and private CI test artifacts. At that handoff the repository was private `hypler-dev/afk-grinder`; bootstrap HEAD was `25ff352`.
 - Original prototype working-tree snapshot: 3 modified tracked files and 20 new source/documentation files, all owned by this slice. No unrelated dirt observed. `.venv/`, `build/`, and the 29 MB local `dist/AFKGrinder.app` are ignored generated state. The local executable is macOS arm64; its SHA-256 is `ead700c6323e98018648ff4a66375a53449c45813b0480916bdce95106e65fa5`.
 
 ### Automated build follow-up
@@ -129,4 +133,17 @@ f413cb849148a3ddf1fbf9b30a61ec9b74abbed53ca1fb0c5f56fc89907d96f3  AFKGrinder-mac
 ```
 
 - The final receipt is documentation-only; source/build artifacts remain tied to `6cde71e`. Documentation-only pushes do not retrigger the path-filtered workflow. No unrelated dirt was observed. `.venv/`, `build/`, `dist/`, and `artifact-output/` remain ignored generated state.
-- GitHub description and README use the user's exact tagline: "Helping kids touch grass by automating their games." Repository visibility remains private. No signing credentials, public releases, app-store submissions, deployment, account/login access, or live game input were used.
+- GitHub description and README use the user's exact tagline: "Helping kids touch grass by automating their games." At the automated-build handoff, repository visibility was private. No signing credentials, public releases, app-store submissions, deployment, account/login access, or live game input were used.
+
+
+### Public repository and supervised Mac follow-up
+
+- Authority: the owner explicitly requested public visibility, appropriate topics, original README artwork, and short supervised Mac tests after manual login. Public repository publication is separate from a signed binary release.
+- Original artwork was generated with built-in image generation and inspected visually. `assets/afk-grinder-banner.png` is 1983 × 793 pixels; `assets/banner-prompt.txt` preserves the exact final prompt. The README embeds the image using a relative path. Subjects are fictional; no game screenshots or photos of the user's children were included.
+- Publication check: Gitleaks v8.30.1 scanned all five existing commits and the downloaded CI logs with no leaks found. The final candidate and committed history are checked again before visibility changes.
+- Mac test build: the verified CI arm64 artifact from source `6cde71ea8f3cd32935956682b0124f9ae9312103`, extracted outside the repository. Deep strict code-signature verification passed. Roblox sign-in was performed manually by the owner; gameplay was visible.
+- Live tests are currently BLOCKED: the application reports missing Accessibility and Input Monitoring permissions and keeps Start disabled. No live game input has been sent. Movement, focus-loss cancellation, physical Escape, and live held-key cleanup remain PENDING; this is not a live-game compatibility pass. The owner was asked to grant permissions manually and reopen the application.
+- Verified GitHub topics: `roblox`, `adopt-me`, `automation`, `afk`, `python`, `tkinter`, `windows`, `macos`, `desktop-app`, `cross-platform`, `touch-grass`, `prototype`. GitHub CLI readback confirmed PUBLIC visibility and all 12 topics after the owner-authorized change.
+- Controller: native GPT/Sol, OpenAI. Fresh independent publication/documentation review by native GPT `gpt_reviewer` (OpenAI Terra) found two P2 documentation issues: ambiguous bind-countdown wording and a public-visibility claim before readback. The wording was corrected and GitHub PUBLIC/topic readback now supports the claim; fresh follow-up review PASS, with no remaining P1/P2/P3 findings. No GLM invocation or external game/account-data transfer occurred. No signing credentials, public binary release, installer publication, deployment, login automation, purchases, or trades were performed.
+
+- Follow-up validation: intent/spec/plan artifact checks, actionlint v1.7.12, README local links, and staged whitespace PASS. Candidate-directory Gitleaks scan (11.85 MB) and repeated all-history scan (five commits, 176.35 KB) found no leaks. macOS administrator authentication is awaiting the owner; input permissions and live tests are not yet confirmed.

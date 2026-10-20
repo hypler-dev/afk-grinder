@@ -44,7 +44,7 @@ Do not request or collect login credentials, session tokens, arbitrary keystroke
 
 ## Compatibility and migration
 
-Windows uses documented Win32 APIs through `ctypes`; macOS uses AppKit/Quartz through PyObjC. Python 3.11+ with Tk is required for source execution. Installer binaries remain future delivery targets. A PyInstaller packaging recipe and private automated test-artifact builds cover Windows x64 and macOS Apple Silicon/Intel. No Linux backend is provided.
+Windows uses documented Win32 APIs through `ctypes`; macOS uses AppKit/Quartz through PyObjC. Python 3.11+ with Tk is required for source execution. Installer binaries remain future delivery targets. A PyInstaller packaging recipe and automated test-artifact builds cover Windows x64 and macOS Apple Silicon/Intel. No Linux backend is provided.
 
 Templates are plain declarative JSON with no executable code, credentials, session tokens, screen images, or arbitrary text entry. The bundled Adopt Me input-check template tests controls only and does not claim to complete gameplay tasks.
 
@@ -52,7 +52,7 @@ Templates are plain declarative JSON with no executable code, credentials, sessi
 
 Use fake backends to test deterministic safety behavior without sending OS input. Native hardware checks remain required on both target platforms. Test focus loss during holds/waits/countdown, Escape, cancellation, close, native errors, cleanup failures, and dry run. Validate packaging separately from game compatibility.
 
-CI builds use hosted target-OS runners, pinned action revisions, and locked Python dependencies. Successful targets upload revision-labeled application archives, build metadata, and SHA-256 checksums with 14-day retention. Windows archives include all adjacent runtime files; Mac tar archives preserve app-bundle modes and symlinks. Unit/UI tests and packaged smoke checks must pass before upload. Native readiness checks may accept documented missing macOS permissions but must reject missing adapter modules or other startup errors. No signing secrets, public release, or live Roblox session is part of CI.
+CI builds use hosted target-OS runners, pinned action revisions, and locked Python dependencies. Successful targets upload revision-labeled application archives, build metadata, and SHA-256 checksums with 14-day retention. Windows archives include all adjacent runtime files; Mac tar archives preserve app-bundle modes and symlinks. Unit/UI tests and packaged smoke checks must pass before upload. Native readiness checks may accept documented missing macOS permissions but must reject missing adapter modules or other startup errors. Repository visibility is public as authorized by the owner. No signing secrets, GitHub release publication, or live Roblox session is part of CI.
 
 ## Non-goals and open questions
 

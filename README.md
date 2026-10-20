@@ -1,5 +1,7 @@
 # AFK Grinder
 
+![AFK Grinder: a friendly robot handles a virtual pet game while children head outside to play.](assets/afk-grinder-banner.png)
+
 **Helping kids touch grass by automating their games.**
 
 A local, supervised Windows/macOS input prototype for Roblox, starting with an editable Adopt Me input-check template.
@@ -65,6 +67,8 @@ python -m afk_grinder --check
 
 The default template holds W for 250 ms, waits 500 ms, and holds S for 250 ms. It is an input test, not a route or AFK grind routine. It has not been proven to work inside Roblox. Each live run consumes its acknowledgment; review the scene again before another run.
 
+For the bounded movement, focus-loss, and physical Escape checks, follow [the supervised Mac test procedure](docs/MAC_LIVE_TEST.md). Fake-backend tests and green CI do not replace these live-game observations.
+
 ## Edit actions
 
 Edit workflow JSON in the app. Copy the JSON to a local file to save it; the prototype has no recorder or import/export controls yet. Templates are data, not executable code:
@@ -112,7 +116,7 @@ Build output is ignored by Git. Windows installer creation and macOS distributio
 
 ## Download automated test builds
 
-Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml), select a successful run, and scroll to **Artifacts**. You must be signed into a GitHub account with access to this private repository.
+Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml), select a successful run, and scroll to **Artifacts**. GitHub requires a signed-in account with read access to download workflow artifacts; this repository is public.
 
 | Download | Target | Contents |
 | --- | --- | --- |
