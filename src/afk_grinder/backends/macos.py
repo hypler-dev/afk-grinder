@@ -1,7 +1,8 @@
 """macOS backend using AppKit and Quartz through PyObjC.
 
-API references: NSWorkspace.frontmostApplication, AXIsProcessTrusted,
-CGPreflightListenEventAccess, CGEventSourceKeyState, and CGEventPost.
+API references: GetFrontProcess, GetProcessPID, NSRunningApplication,
+AXIsProcessTrusted, CGPreflightListenEventAccess, CGEventSourceKeyState, and
+CGEventPost.
 """
 
 from __future__ import annotations
@@ -47,28 +48,84 @@ class MacOSBackend:
             raise RuntimeError(f"macOS native API initialization failed: {error}") from error
 
     def foreground(self) -> Target | None:
-        """Return frontmost process identity without inspecting a window title."""
+        """Return live front-process identity without inspecting a window title."""
         try:
             with self._objc.autorelease_pool():
-                application = self._AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+                get_front_process = self._foreground_function("GetFrontProcess")
+                status, process_serial_number = get_front_process(None)
+                if status != 0:
+                    raise RuntimeError(
+                        "macOS foreground process query failed: "
+                        f"GetFrontProcess returned status {status}."
+                    )
+                if process_serial_number is None:
+                    raise RuntimeError(
+                        "macOS foreground process query failed: "
+                        "GetFrontProcess returned no process serial number."
+                    )
+
+                get_process_pid = self._foreground_function("GetProcessPID")
+                status, pid = get_process_pid(process_serial_number, None)
+                if status != 0:
+                    raise RuntimeError(
+                        "macOS foreground process query failed: "
+                        f"GetProcessPID returned status {status}."
+                    )
+                pid = int(pid)
+                if pid <= 0:
+                    raise RuntimeError(
+                        "macOS foreground process query failed: "
+                        "GetProcessPID returned an invalid process identifier."
+                    )
+
+                resolver_type = getattr(self._AppKit, "NSRunningApplication", None)
+                resolver = getattr(resolver_type, "runningApplicationWithProcessIdentifier_", None)
+                if not callable(resolver):
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        "NSRunningApplication resolver is unavailable."
+                    )
+                application = resolver(pid)
                 if application is None:
-                    return None
-                pid = int(application.processIdentifier())
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        f"NSRunningApplication found no process for PID {pid}."
+                    )
+                resolved_pid = int(application.processIdentifier())
+                if resolved_pid != pid:
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        f"NSRunningApplication returned PID {resolved_pid} for queried PID {pid}."
+                    )
                 bundle_identifier = application.bundleIdentifier()
                 executable_url = application.executableURL()
-                if pid <= 0 or not bundle_identifier or executable_url is None:
-                    return None
-                executable = str(executable_url.lastPathComponent())
-                if not executable:
-                    return None
+                if not bundle_identifier:
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        "NSRunningApplication returned incomplete process metadata."
+                    )
+                if executable_url is None:
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        "NSRunningApplication returned incomplete executable metadata."
+                    )
+                executable_component = executable_url.lastPathComponent()
+                if not executable_component:
+                    raise RuntimeError(
+                        "macOS foreground identity unavailable: "
+                        "NSRunningApplication returned incomplete executable metadata."
+                    )
+                executable = str(executable_component)
                 return Target(
                     pid=pid,
                     token=str(pid),
                     executable=executable,
                     identifier=str(bundle_identifier),
                 )
-        except Exception:
-            return None
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"macOS foreground process query failed: {error}") from error
 
     def readiness(self) -> list[str]:
         """Check existing permissions only; this method never triggers a macOS prompt."""
@@ -91,6 +148,7 @@ class MacOSBackend:
             "Accessibility permission is required to post native input events.",
             self._Quartz,
         )
+        self._append_foreground_readiness_problems(problems)
         return problems
 
     def escape_pressed(self) -> bool:
@@ -217,6 +275,29 @@ class MacOSBackend:
                 problems.append(message)
         except Exception as error:
             problems.append(f"{check_name} failed: {error}. {message}")
+
+    def _append_foreground_readiness_problems(self, problems: list[str]) -> None:
+        for function_name in ("GetFrontProcess", "GetProcessPID"):
+            if not callable(getattr(self._ApplicationServices, function_name, None)):
+                problems.append(
+                    f"{function_name} is unavailable; cannot verify the live foreground process."
+                )
+        resolver_type = getattr(self._AppKit, "NSRunningApplication", None)
+        resolver = getattr(resolver_type, "runningApplicationWithProcessIdentifier_", None)
+        if not callable(resolver):
+            problems.append(
+                "NSRunningApplication resolver is unavailable; "
+                "cannot verify foreground process identity."
+            )
+
+    def _foreground_function(self, function_name: str) -> Any:
+        function = getattr(self._ApplicationServices, function_name, None)
+        if not callable(function):
+            raise RuntimeError(
+                "macOS foreground process unavailable: "
+                f"{function_name} is unavailable."
+            )
+        return function
 
     def _mouse_parameters(self, button: str, is_mouse_up: bool) -> tuple[Any, Any]:
         if button == "left":

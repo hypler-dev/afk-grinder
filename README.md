@@ -61,7 +61,7 @@ python -m afk_grinder --check
 1. Launch the app in its default **Dry run** mode. Validate the workflow and run it; no OS input is sent.
 2. Sign into Roblox manually, enter the game, close chat/menus, and position the character away from sensitive interactions. Keep the game visible.
 3. Select **Live input**. Refresh readiness and resolve any reported permissions. On macOS, Accessibility and Input Monitoring permission must be enabled for the relevant Python/application identity in System Settings; restart the app after permission changes if needed. The app does not request or grant permissions silently.
-4. Click **Bind foreground Roblox** and switch manually to Roblox during the three-second countdown. The binding pins the process, and its window handle on Windows. Return to the prototype to inspect the binding.
+4. Click **Bind Roblox after 3 seconds** and switch manually to Roblox during the three-second countdown. The binding pins the process, and its window handle on Windows. Return to the prototype to inspect the binding.
 5. Review the short JSON sequence. Confirm manual login/gameplay readiness, click Start, and switch to the bound Roblox window during the three-second countdown.
 6. Press **Escape** to stop live execution. Clicking Stop or closing the prototype also cancels. Switching away from the bound target during playback stops the run; it never resumes automatically.
 
@@ -115,6 +115,8 @@ With uv, use `uv sync --locked --extra build` followed by `uv run --locked --ext
 Build output is ignored by Git. Windows installer creation and macOS distribution packaging, signing/notarization, clean-machine installation, upgrade/uninstall, and release publication remain future work. Do not treat an ad hoc signed or unsigned local build as a trusted production release.
 
 ## Download automated test builds
+
+**Mac build warning:** artifacts from `6cde71e` and `980772a` contain a stale-focus bug and must not be used for live input. Use a successful build containing the Mac foreground-cache correction. Build/startup checks alone did not detect this native behavior.
 
 Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml), select a successful run, and scroll to **Artifacts**. GitHub requires a signed-in account with read access to download workflow artifacts; this repository is public.
 

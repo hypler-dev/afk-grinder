@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from pathlib import Path
 import sys
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -24,9 +25,69 @@ class FakeObjC:
 class FakeApplicationServices:
     def __init__(self, trusted: bool = True) -> None:
         self.trusted = trusted
+        self.front_process_status = 0
+        self.process_pid_status = 0
+        self.front_process: object | None = "front"
+        self.process_ids: dict[object, int] = {"front": 101}
 
     def AXIsProcessTrusted(self) -> bool:
         return self.trusted
+
+    def GetFrontProcess(self, unused) -> tuple[int, object | None]:
+        return self.front_process_status, self.front_process
+
+    def GetProcessPID(self, process_serial_number, unused) -> tuple[int, int | None]:
+        return self.process_pid_status, self.process_ids.get(process_serial_number)
+
+
+class FakeExecutableURL:
+    def __init__(self, name: str | None) -> None:
+        self.name = name
+
+    def lastPathComponent(self) -> str | None:
+        return self.name
+
+
+class FakeRunningApplication:
+    def __init__(
+        self,
+        pid: int,
+        *,
+        bundle_identifier: str | None = "com.roblox.RobloxPlayer",
+        executable: str | None = "RobloxPlayer",
+    ) -> None:
+        self.pid = pid
+        self.bundle_identifier = bundle_identifier
+        self.executable = executable
+
+    def processIdentifier(self) -> int:
+        return self.pid
+
+    def bundleIdentifier(self) -> str | None:
+        return self.bundle_identifier
+
+    def executableURL(self) -> FakeExecutableURL | None:
+        return None if self.executable is None else FakeExecutableURL(self.executable)
+
+
+class FakeRunningApplicationResolver:
+    def __init__(self, applications: dict[int, FakeRunningApplication]) -> None:
+        self.applications = applications
+
+    def runningApplicationWithProcessIdentifier_(self, pid: int) -> FakeRunningApplication | None:
+        return self.applications.get(pid)
+
+
+class TrapWorkspace:
+    @staticmethod
+    def sharedWorkspace():
+        raise AssertionError("NSWorkspace must not be used for foreground process reads")
+
+
+class FakeAppKit:
+    def __init__(self, applications: dict[int, FakeRunningApplication]) -> None:
+        self.NSRunningApplication = FakeRunningApplicationResolver(applications)
+        self.NSWorkspace = TrapWorkspace
 
 
 class FakeQuartz:
@@ -72,18 +133,21 @@ class FakeQuartz:
 
 def fake_macos_backend(
     *, listen: bool = True, post: bool = True, trusted: bool = True
-) -> tuple[MacOSBackend, FakeQuartz]:
+) -> tuple[MacOSBackend, FakeQuartz, FakeApplicationServices, FakeAppKit]:
     backend = object.__new__(MacOSBackend)
     quartz = FakeQuartz(listen=listen, post=post)
     backend._Quartz = quartz
-    backend._ApplicationServices = FakeApplicationServices(trusted)
+    application_services = FakeApplicationServices(trusted)
+    app_kit = FakeAppKit({101: FakeRunningApplication(101)})
+    backend._ApplicationServices = application_services
+    backend._AppKit = app_kit
     backend._objc = FakeObjC()
-    return backend, quartz
+    return backend, quartz, application_services, app_kit
 
 
 class MacOSBackendTests(unittest.TestCase):
     def test_escape_state_and_fail_closed_errors(self) -> None:
-        backend, quartz = fake_macos_backend()
+        backend, quartz, _, _ = fake_macos_backend()
         self.assertFalse(backend.escape_pressed())
         quartz.escape = True
         self.assertTrue(backend.escape_pressed())
@@ -96,7 +160,7 @@ class MacOSBackendTests(unittest.TestCase):
             backend.escape_pressed()
 
     def test_readiness_reports_denied_preflights(self) -> None:
-        backend, _ = fake_macos_backend(listen=False, post=False, trusted=False)
+        backend, _, _, _ = fake_macos_backend(listen=False, post=False, trusted=False)
 
         problems = backend.readiness()
 
@@ -105,7 +169,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertTrue(any("Input Monitoring permission" in problem for problem in problems))
 
     def test_missing_listen_permission_blocks_down_but_not_up(self) -> None:
-        backend, quartz = fake_macos_backend(listen=False)
+        backend, quartz, _, _ = fake_macos_backend(listen=False)
 
         with self.assertRaisesRegex(RuntimeError, "Input Monitoring permission"):
             backend.key_down("w")
@@ -114,7 +178,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(len(quartz.posted), 1)
 
     def test_none_and_native_post_errors_are_explicit(self) -> None:
-        backend, quartz = fake_macos_backend()
+        backend, quartz, _, _ = fake_macos_backend()
         quartz.keyboard_event = None
         with self.assertRaisesRegex(RuntimeError, "could not create event"):
             backend.key_down("w")
@@ -123,6 +187,82 @@ class MacOSBackendTests(unittest.TestCase):
         quartz.post_error = OSError("native post failure")
         with self.assertRaisesRegex(RuntimeError, "event post failed"):
             backend.key_down("w")
+
+    def test_foreground_uses_live_pid_on_same_backend_and_worker_thread(self) -> None:
+        backend, _, application_services, app_kit = fake_macos_backend()
+        app_kit.NSRunningApplication.applications[202] = FakeRunningApplication(
+            202,
+            bundle_identifier="com.example.other",
+            executable="OtherApp",
+        )
+
+        first = backend.foreground()
+        application_services.front_process = "next"
+        application_services.process_ids["next"] = 202
+        result: list[object] = []
+        worker = threading.Thread(target=lambda: result.append(backend.foreground()))
+        worker.start()
+        worker.join()
+
+        self.assertEqual(first.pid, 101)
+        self.assertEqual(result[0].pid, 202)
+        self.assertEqual(result[0].identifier, "com.example.other")
+
+    def test_foreground_native_query_errors_fail_closed(self) -> None:
+        backend, _, application_services, _ = fake_macos_backend()
+        application_services.front_process_status = -1
+        with self.assertRaisesRegex(RuntimeError, "GetFrontProcess returned status -1"):
+            backend.foreground()
+
+        application_services.front_process_status = 0
+        application_services.process_pid_status = -2
+        with self.assertRaisesRegex(RuntimeError, "GetProcessPID returned status -2"):
+            backend.foreground()
+
+    def test_foreground_identity_errors_fail_closed(self) -> None:
+        backend, _, application_services, app_kit = fake_macos_backend()
+        app_kit.NSRunningApplication.applications[101] = FakeRunningApplication(
+            101, bundle_identifier=None
+        )
+        with self.assertRaisesRegex(RuntimeError, "incomplete process metadata"):
+            backend.foreground()
+
+        app_kit.NSRunningApplication.applications[101] = FakeRunningApplication(999)
+        with self.assertRaisesRegex(RuntimeError, "returned PID 999 for queried PID 101"):
+            backend.foreground()
+
+        application_services.process_ids["front"] = 303
+        with self.assertRaisesRegex(RuntimeError, "found no process for PID 303"):
+            backend.foreground()
+
+    def test_foreground_missing_executable_metadata_fails_closed(self) -> None:
+        backend, _, _, app_kit = fake_macos_backend()
+        application = app_kit.NSRunningApplication.applications[101]
+        application.executable = None
+        with self.assertRaisesRegex(RuntimeError, "incomplete executable metadata"):
+            backend.foreground()
+
+        application.executableURL = lambda: FakeExecutableURL(None)
+        with self.assertRaisesRegex(RuntimeError, "incomplete executable metadata"):
+            backend.foreground()
+
+        application.executableURL = lambda: FakeExecutableURL("")
+        with self.assertRaisesRegex(RuntimeError, "incomplete executable metadata"):
+            backend.foreground()
+
+    def test_missing_foreground_functions_and_resolver_fail_closed(self) -> None:
+        backend, _, application_services, app_kit = fake_macos_backend()
+        application_services.GetFrontProcess = None
+        application_services.GetProcessPID = None
+        app_kit.NSRunningApplication = None
+
+        problems = backend.readiness()
+
+        self.assertTrue(any("GetFrontProcess is unavailable" in problem for problem in problems))
+        self.assertTrue(any("GetProcessPID is unavailable" in problem for problem in problems))
+        self.assertTrue(any("NSRunningApplication resolver is unavailable" in problem for problem in problems))
+        with self.assertRaisesRegex(RuntimeError, "GetFrontProcess is unavailable"):
+            backend.foreground()
 
 
 class WindowsBackendTests(unittest.TestCase):
