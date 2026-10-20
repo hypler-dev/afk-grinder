@@ -103,6 +103,11 @@ def main() -> None:
     command.append(str(root / "tools" / "launch.py"))
     environment = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(root / "build" / "pyinstaller-cache"))
     subprocess.run(command, cwd=root, env=environment, check=True)
+    if sys.platform == "darwin":
+        from macos_bundle import stamp_unsigned_bundle_version
+
+        version = json.loads(build_info.read_text(encoding="utf-8"))["version"]
+        stamp_unsigned_bundle_version(root / "dist" / "AFKGrinder.app", version)
     if args.with_recognition:
         from sdk_bundle import validate_recognition_bundle
 
