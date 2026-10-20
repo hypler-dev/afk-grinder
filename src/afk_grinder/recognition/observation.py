@@ -101,6 +101,8 @@ class Calibration:
     @classmethod
     def create(cls, observation: Observation, reference_size: tuple[int, int],
                viewport: Rect | None = None) -> "Calibration":
+        if observation.layout.region_kind != "client" or not observation.layout.content_verified:
+            raise ValueError("Verified content bounds are required before coordinate calibration.")
         if len(reference_size) != 2 or any(type(v) is not int or v <= 0 for v in reference_size):
             raise ValueError("Reference size must contain two positive integer dimensions.")
         width, height = observation.layout.physical_size

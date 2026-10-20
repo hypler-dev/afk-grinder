@@ -8,6 +8,7 @@ CGEventPost.
 from __future__ import annotations
 
 import importlib
+import math
 import sys
 from typing import Any
 
@@ -255,6 +256,24 @@ class MacOSBackend:
     def mouse_down(self, button: str) -> None:
         self._send_mouse(button, is_mouse_up=False)
 
+    def mouse_down_at(self, button: str, x: float, y: float) -> None:
+        """Press ``button`` at a supplied native top-left coordinate."""
+        self._validate_button(button)
+        self._validate_native_point(x, y)
+        self._ensure_input_readiness()
+        operation = f"mouse_down_at({button!r}, {x!r}, {y!r})"
+        try:
+            with self._objc.autorelease_pool():
+                event_type, mouse_button = self._mouse_parameters(button, is_mouse_up=False)
+                event = self._Quartz.CGEventCreateMouseEvent(
+                    None, event_type, (x, y), mouse_button
+                )
+                self._post_event(event, operation)
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"macOS {operation} failed: {error}") from error
+
     def mouse_up(self, button: str) -> None:
         self._send_mouse(button, is_mouse_up=True)
 
@@ -406,3 +425,11 @@ class MacOSBackend:
             raise ValueError(
                 f"Unsupported mouse button {button!r}; allowed buttons: {', '.join(sorted(BUTTONS))}."
             )
+
+    @staticmethod
+    def _validate_native_point(x: float, y: float) -> None:
+        for name, value in (("x", x), ("y", y)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"Native mouse coordinate {name} must be a finite number.")
+            if not math.isfinite(value):
+                raise ValueError(f"Native mouse coordinate {name} must be finite.")

@@ -7,6 +7,7 @@ import json
 import sys
 import threading
 import time
+import os
 from typing import Any
 
 from .build_info import build_info
@@ -52,6 +53,38 @@ def _smoke_resize(window: Any, width: int, height: int) -> float:
         print(f"Launcher smoke viewport: requested={width} available={int(screen_width)} "
               f"target={target_width} actual={actual_width}.", flush=True)
     return actual_width
+
+
+def _smoke_popup_models() -> None:
+    """Exercise bundled OCR in private builds using synthetic pixels only."""
+    from .recognition.ocr_models import model_directory, validate_models
+    models = model_directory()
+    if not models.exists():
+        return
+    from PIL import Image, ImageDraw, ImageFont
+    from .recognition.service import RecognitionService
+    service = RecognitionService(validate_models(models), {"bank": r"bank"})
+    try:
+        service.start()
+        deadline = time.monotonic() + 10
+        while not service.ready:
+            if service.poll() is not None or time.monotonic() >= deadline:
+                raise RuntimeError("Private OCR worker did not warm.")
+            time.sleep(.02)
+        image = Image.new("RGB", (800, 400), "white")
+        ImageDraw.Draw(image).text((60, 70), "BANK", fill="black", font=ImageFont.load_default(size=64))
+        service.submit(800, 400, image.tobytes("raw", "BGR"))
+        deadline = time.monotonic() + 3
+        result = None
+        while result is None and time.monotonic() < deadline:
+            result = service.poll()
+            time.sleep(.02)
+        if result is None or result.error or tuple(hit.label_id for hit in result.hits) != ("bank",):
+            raise RuntimeError("Private synthetic OCR label check failed.")
+        if sys.stdout is not None:
+            print("Private popup OCR worker passed with synthetic pixels. No OS input or capture used.", flush=True)
+    finally:
+        service.close()
 
 
 def restricted_dispatch(original: Any) -> Any:
@@ -208,7 +241,19 @@ def open_desktop(*, smoke: bool = False) -> None:
         except Exception:
             backend = None
     metadata = build_info()
-    controller = DesktopController(backend=backend, buildmetadata=metadata)
+    replay_service = None
+    if not smoke:
+        from .replay_service import ReplayService
+        if sys.platform == "darwin":
+            replay_root = Path.home() / "Library" / "Application Support" / "AFKGrinder" / "replay"
+        else:
+            local = os.environ.get("LOCALAPPDATA")
+            if not local or not Path(local).is_absolute():
+                raise RuntimeError("Windows local application storage is unavailable.")
+            replay_root = Path(local) / "AFKGrinder" / "replay"
+        replay_service = ReplayService(replay_root)
+    controller = DesktopController(backend=backend, buildmetadata=metadata,
+                                   replay_service=replay_service)
     api = DesktopAPI(controller)
     entry = Path(__file__).with_name("web") / "index.html"
     if not entry.is_file():
@@ -345,6 +390,8 @@ def open_desktop(*, smoke: bool = False) -> None:
             missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
             if not missing_sdk and (result.error or result.report is None):
                 raise RuntimeError("Spawned recognition service failed.")
+            stage = "private_popup_models"
+            _smoke_popup_models()
             stage = "ui_state"
             if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
                 raise RuntimeError("Inactive cleanup warning is visible.")
@@ -369,7 +416,7 @@ def open_desktop(*, smoke: bool = False) -> None:
                         time.sleep(0.05)
                     else:
                         raise RuntimeError("Native interface scaling or Stop layout failed.")
-                    for route in ("library", "session", "setup", "routines", "packs", "settings"):
+                    for route in ("library", "session", "replay", "setup", "routines", "packs", "settings"):
                         stage = f"interface_scale_{width}_{percent}_{route}"
                         selector = json.dumps(f'[data-route="{route}"]')
                         fits = window.evaluate_js("""(() => {
@@ -381,6 +428,9 @@ def open_desktop(*, smoke: bool = False) -> None:
                         })()""")
                         if fits is not True:
                             raise RuntimeError("Native launcher section overflowed at interface scale.")
+                        if sys.stdout is not None:
+                            print(f"Launcher smoke route: {route} viewport={width} zoom={percent}% "
+                                  "fit=true stop=true.", flush=True)
             stage = "blocked_navigation"
             rejected.clear()
             blocked_url = entry.with_name("styles.css").resolve().as_uri()

@@ -16,13 +16,18 @@ import threading
 import time
 from typing import Any, Callable
 import zlib
+import uuid
+from dataclasses import asdict
+from afk_grinder.replay import ReplaySettings
+from afk_grinder.session_recorder import SessionRecorder
 
 from afk_grinder.capture import CaptureDiagnostic, CapturedWindow, capture_error_type
 from afk_grinder.capture.service import BackgroundJob, JobResult
 from afk_grinder.engine import Runner
 from afk_grinder.models import Target, Workflow
 from afk_grinder.recognition.frame_geometry import layout_from_capture
-from afk_grinder.recognition.observation import Layout, ObservationTracker, Rect
+from afk_grinder.recognition.observation import Layout, Observation, ObservationTracker, Rect
+from afk_grinder.recognition.content_calibration import ContentCalibration
 from afk_grinder.templates import DEFAULT_TEMPLATE, parse_template
 
 
@@ -93,6 +98,8 @@ class DesktopController:
         job_factory: Callable[..., Any] = BackgroundJob,
         clock: Callable[[], float] = time.monotonic,
         buildmetadata: dict[str, Any] | None = None,
+        replay_service: Any = None,
+        recorder_factory: Any = SessionRecorder,
     ) -> None:
         self._backend = backend
         self._runner = runner if runner is not None else Runner(backend)
@@ -100,6 +107,9 @@ class DesktopController:
         self._clock = clock
         self._lock = threading.RLock()
         self._closing = False
+        self._replay_service = replay_service
+        self._recorder_factory = recorder_factory
+        self._recorder = None
         self._mode = "dry"
         self._game_id = "adopt"
         self._workflow: Workflow | None = parse_template(DEFAULT_TEMPLATE)
@@ -142,7 +152,14 @@ class DesktopController:
         self._sdk_message = "Recognition has not been checked."
         self._area: Rect | None = None
         self._area_layout: Layout | None = None
+        self._content_calibration: ContentCalibration | None = None
         self._tracker = ObservationTracker()
+        self._popup_thread: threading.Thread | None = None
+        self._popup_cancel = threading.Event()
+        self._popup_phase = "idle"
+        self._popup_state = "unknown"
+        self._popup_message = "Calibrate content before checking popups."
+        self._allow_reconnect = False
         metadata = dict(buildmetadata or {})
         self._app = {
             "version": str(metadata.get("version", "0.2.0")),
@@ -163,7 +180,7 @@ class DesktopController:
                 for index, target_id in enumerate(sorted(self._targets), 1)
             ]
             cleanup_failed = bool(getattr(self._runner, "cleanup_failed", False))
-            input_locked = bool(getattr(self._runner, "running", False)) or self._job is not None
+            input_locked = self._busy_locked()
             phase = self._session_phase(cleanup_failed, input_locked)
             return {
                 "schema_version": 1,
@@ -196,9 +213,19 @@ class DesktopController:
                     "region_kind": self._preview_region_kind,
                     "area": self._area_payload(),
                     "geometry": self._geometry_phase(),
+                    "calibration_method": "manual" if self._content_calibration else "none",
                     "error": dict(self._preview_error) if self._preview_error else None,
                 },
                 "sdk": {"phase": self._sdk_phase, "message": self._sdk_message},
+                "popup": {
+                    "phase": self._popup_phase, "state": self._popup_state,
+                    "message": self._popup_message,
+                    "busy": self._popup_busy() or (bool(getattr(self._runner, "running", False))
+                                                  and self._popup_phase == "checking"),
+                    "can_check": self._can_popup(False), "can_resolve": self._can_popup(True),
+                    "allow_reconnect": self._allow_reconnect,
+                },
+                "replay": self._replay_state(),
                 "template": {
                     "json": self._template_json,
                     "valid": self._workflow is not None,
@@ -212,6 +239,14 @@ class DesktopController:
     def get_preview(self, preview_id: Any) -> dict[str, str] | None:
         """Return only the current bounded in-memory PNG after daemon encoding."""
         self._poll()
+        if type(preview_id) is dict and set(preview_id) == {"replay_frame_id"}:
+            frame_id = preview_id["replay_frame_id"]
+            if (type(frame_id) is not str or len(frame_id) != 32
+                    or any(c not in "0123456789abcdef" for c in frame_id)
+                    or self._replay_service is None or self._closing):
+                return None
+            frame = self._replay_service.poll().get("frame")
+            return frame if frame is not None and frame.get("frame_id") == frame_id else None
         if not _is_int(preview_id):
             return None
         with self._lock:
@@ -228,6 +263,9 @@ class DesktopController:
             "select_game", "set_mode", "refresh_targets", "select_target", "refresh_readiness",
             "set_ack", "set_template", "start", "stop", "capture", "clear_preview", "set_area",
             "reset_area", "check_area", "sdk_check",
+            "popup_check", "popup_resolve", "set_reconnect",
+            "replay_settings", "replay_select", "replay_frame", "replay_delete",
+            "replay_older", "replay_sessions",
         }
         if name not in allowed:
             return self._response(False, "unknown_command", "Command is not supported.")
@@ -270,6 +308,18 @@ class DesktopController:
                 self._reset_area()
             elif name == "check_area":
                 self._check_area(payload)
+            elif name in {"popup_check", "popup_resolve"}:
+                self._require_payload(payload, set())
+                self._start_popup(name == "popup_resolve")
+            elif name == "set_reconnect":
+                self._require_payload(payload, {"enabled"})
+                if type(payload["enabled"]) is not bool:
+                    raise ValueError("Reconnect setting must be boolean.")
+                with self._lock:
+                    self._require_reference_mutation_locked()
+                    self._allow_reconnect = payload["enabled"]
+            elif name.startswith("replay_"):
+                self._replay_command(name, payload)
             else:
                 self._require_payload(payload, set())
                 self._start_sdk_check()
@@ -286,6 +336,7 @@ class DesktopController:
         job = None
         with self._lock:
             self._closing = True
+            self._popup_cancel.set()
             self._acknowledged = False
             if self._start_cancel is not None:
                 self._start_cancel.set()
@@ -293,6 +344,8 @@ class DesktopController:
             self._clear_preview_locked()
         if job is not None:
             job.cancel()
+        if self._replay_service is not None:
+            self._replay_service.close()
         with self._lock:
             if not self._close_stop_started:
                 self._close_stop_started = True
@@ -411,6 +464,10 @@ class DesktopController:
             if not dry_run:
                 if not acknowledged or target is None or self._readiness_phase != "ready":
                     raise RuntimeError("Live input needs a selected target, readiness, and fresh acknowledgment.")
+                if (self._replay_service is not None
+                        and self._replay_service.poll()["settings"].get("enabled") is True
+                        and self._content_calibration is None):
+                    raise RuntimeError("Calibrate game content before a live session with replay enabled.")
             self._starting = True
             self._run_phase = "countdown"
             cancel_event = threading.Event()
@@ -419,7 +476,21 @@ class DesktopController:
         try:
             self._runner.start(workflow, target=target, dry_run=dry_run, armed=not dry_run,
                                cancel_event=cancel_event)
+            with self._lock:
+                calibration = self._content_calibration
+                replay_enabled = (self._replay_service is not None
+                                  and self._replay_service.poll()["settings"].get("enabled") is True)
+                if (not dry_run and replay_enabled and calibration is not None
+                        and calibration.source_layout.target == target and not cancel_event.is_set()):
+                    self._recorder = self._recorder_factory(
+                        backend=self._backend, calibration=calibration, service=self._replay_service,
+                        active=lambda: (self._start_cancel is cancel_event
+                                        and bool(getattr(self._runner, "running", False))),
+                        cancel=cancel_event)
+                    self._recorder.start()
         except Exception:
+            cancel_event.set()
+            self._runner.stop()
             with self._lock:
                 self._message = "Run could not start."
             raise RuntimeError("Run could not start.") from None
@@ -429,6 +500,10 @@ class DesktopController:
 
     def _stop(self) -> None:
         with self._lock:
+            self._popup_cancel.set()
+            self._popup_phase = "idle"
+            self._popup_state = "unknown"
+            self._popup_message = "Popup operation stopped; fresh checks required."
             self._acknowledged = False
             if self._start_cancel is not None:
                 self._start_cancel.set()
@@ -436,6 +511,136 @@ class DesktopController:
             self._message = "Stopping input." if active else "Input stopped."
             self._run_phase = "stopping" if active else "stopped"
         self._runner.stop()
+
+    def _popup_busy(self) -> bool:
+        return self._popup_thread is not None and self._popup_thread.is_alive()
+
+    def _replay_state(self) -> dict[str, Any]:
+        if self._replay_service is None:
+            return {"settings": asdict(ReplaySettings()), "phase": "unavailable",
+                    "message": "Replay storage is unavailable.", "sessions": [], "frames": [],
+                    "stats": {"frame_count": 0, "session_count": 0, "byte_count": 0}, "frame": None}
+        state = self._replay_service.poll()
+        if state.get("frame") is not None:
+            state["frame"] = {"frame_id": state["frame"]["frame_id"]}
+        return state
+
+    def _replay_command(self, name: str, payload: dict[str, Any]) -> None:
+        if self._replay_service is None:
+            raise RuntimeError("Replay storage is unavailable.")
+        if name == "replay_settings":
+            self._require_payload(payload, {"settings"})
+            raw = payload["settings"]
+            if type(raw) is not dict or set(raw) != set(asdict(ReplaySettings())):
+                raise ValueError("Replay settings are malformed.")
+            value = ReplaySettings(**raw)
+            kind = "settings"
+        elif name == "replay_sessions":
+            self._require_payload(payload, {"older"})
+            value = payload["older"]
+            if type(value) is not bool:
+                raise ValueError("Replay page direction is invalid.")
+            kind = "sessions"
+        else:
+            key = "frame_id" if name == "replay_frame" else "session_id"
+            self._require_payload(payload, {key})
+            value = payload[key]
+            if (type(value) is not str or len(value) != 32
+                    or any(c not in "0123456789abcdef" for c in value)):
+                raise ValueError("Replay identifier is invalid.")
+            kind = name.removeprefix("replay_")
+        if not self._replay_service.command(kind, value):
+            raise RuntimeError("Replay operation is busy or unavailable.")
+
+    def _can_popup(self, resolve: bool) -> bool:
+        if (self._closing or self._busy_locked() or self._game_id != "adopt"
+                or self._content_calibration is None or self._selected_id is None
+                or bool(getattr(self._runner, "cleanup_failed", False))):
+            return False
+        return not resolve or (self._mode == "live" and self._readiness_phase == "ready"
+                               and self._popup_state in {"bank_reward", "disconnected"}
+                               and (self._popup_state != "disconnected" or self._allow_reconnect))
+
+    def _start_popup(self, resolve: bool) -> None:
+        from afk_grinder.popup_session import PopupSession
+        start_request = None
+        with self._lock:
+            if not self._can_popup(resolve):
+                raise RuntimeError("Popup check needs calibrated content; live response also needs a known allowed popup.")
+            calibration = self._content_calibration
+            cancel = threading.Event()
+            self._popup_cancel = cancel
+            self._acknowledged = False
+            self._popup_phase = "checking"
+            self._popup_message = "Starting local popup check."
+            allow_reconnect = self._allow_reconnect
+
+            def report(state, message):
+                with self._lock:
+                    if (cancel.is_set() or self._closing
+                            or calibration is not self._content_calibration):
+                        return
+                    self._popup_state = state
+                    self._popup_message = message
+                    self._popup_phase = "checking" if state in {"checking", "verifying"} else "result"
+
+            session_id = uuid.uuid4().hex
+            def record(frame, state):
+                service = getattr(self, "_replay_service", None)
+                if service is not None and not cancel.is_set():
+                    service.submit(frame, session_id, state)
+
+            operation = PopupSession(calibration, report=report, record=record)
+            def end_recording():
+                if self._replay_service is not None:
+                    self._replay_service.stop_session(session_id)
+            if resolve:
+                self._start_cancel = cancel
+                self._starting = True
+                def resolve_operation(capability):
+                    try:
+                        operation.resolve(capability, allow_reconnect=allow_reconnect)
+                    except Exception:
+                        report("error", "Popup response stopped. No further action will run.")
+                        raise
+                    finally:
+                        end_recording()
+                start_request = (resolve_operation, calibration.source_layout.target, cancel)
+            else:
+                def check():
+                    deadline = self._clock() + 30
+                    def guard():
+                        if cancel.is_set() or self._clock() >= deadline:
+                            raise RuntimeError("Popup check canceled.")
+                    def wait(seconds):
+                        cancel.wait(seconds)
+                        guard()
+                    try:
+                        operation.check(guard, wait)
+                    except Exception:
+                        report("error", "Popup check stopped. Check capture, content area and local recognition setup.")
+                    finally:
+                        operation.close()
+                        end_recording()
+                self._popup_thread = threading.Thread(target=check, daemon=True, name="popup-check")
+                self._popup_thread.start()
+        if start_request is not None:
+            routine, target, cancel = start_request
+            try:
+                # Native readiness may block. Stop must still acquire the
+                # controller lock and revoke this admission ticket.
+                self._runner.start_routine(routine, target=target, armed=True, cancel_event=cancel)
+            except Exception:
+                cancel.set()
+                self._runner.stop()
+                with self._lock:
+                    self._popup_phase = "result"
+                    self._popup_state = "error"
+                    self._popup_message = "Popup response could not start. No further action will run."
+                raise RuntimeError("Popup response could not start.") from None
+            finally:
+                with self._lock:
+                    self._starting = False
 
     def _start_capture(self) -> None:
         with self._lock:
@@ -489,8 +694,13 @@ class DesktopController:
         self._clear_geometry_locked()
 
     def _clear_geometry_locked(self) -> None:
+        self._popup_cancel.set()
+        self._popup_state = "unknown"
+        self._popup_phase = "idle"
+        self._popup_message = "Calibrate content before checking popups."
         self._area = None
         self._area_layout = None
+        self._content_calibration = None
         self._tracker.invalidate()
 
     def _reset_area(self) -> None:
@@ -498,6 +708,7 @@ class DesktopController:
             self._require_reference_mutation_locked()
             self._area = None
             self._area_layout = None
+            self._content_calibration = None
             self._tracker.invalidate()
 
     def _set_area(self, payload: dict[str, Any]) -> None:
@@ -515,16 +726,19 @@ class DesktopController:
                 raise ValueError("Area must use non-negative whole pixels.")
             x, y, width, height = values
             image_width, image_height = self._preview_layout.physical_size
-            if width <= 0 or height <= 0 or width * 9 != height * 16:
-                raise ValueError("Area must be 16:9.")
+            if width <= 0 or height <= 0:
+                raise ValueError("Area dimensions must be positive.")
             if x + width > image_width or y + height > image_height:
                 raise ValueError("Area is outside the preview.")
             self._area = Rect(x, y, width, height)
             self._area_layout = self._preview_layout
+            self._content_calibration = None
             self._tracker.invalidate()
 
     def _check_area(self, payload: dict[str, Any]) -> None:
-        self._require_payload(payload, {"preview_id"})
+        self._require_payload(payload, {"preview_id", "attested"})
+        if payload["attested"] is not True:
+            raise ValueError("Confirm the selected box contains only Roblox game content.")
         with self._lock:
             self._require_reference_mutation_locked()
             if (not _is_int(payload["preview_id"]) or payload["preview_id"] != self._preview_id
@@ -741,8 +955,14 @@ class DesktopController:
             if context.area is not None:
                 if layout != context.source_layout:
                     raise ValueError("Layout changed.")
-                self._tracker.accept(layout, result.frame.pixels, result.frame.captured_at, now)
-                self._tracker.calibrate((1280, 720), context.area, now=now)
+                viewport = tuple(int(value) for value in (context.area.x, context.area.y,
+                                                          context.area.width, context.area.height))
+                calibration = ContentCalibration.manual(layout, viewport)
+                cropped = calibration.crop(Observation(layout, result.frame.captured_at, 1, 1,
+                                                       result.frame.pixels))
+                self._tracker.accept(cropped.layout, cropped.pixels, cropped.captured_at, now)
+                self._tracker.calibrate(cropped.layout.physical_size, now=now)
+                self._content_calibration = calibration
             elif fresh:
                 self._tracker.accept(layout, result.frame.pixels, result.frame.captured_at, now)
             else:
@@ -780,7 +1000,8 @@ class DesktopController:
         self._explicit_target = None
 
     def _busy_locked(self) -> bool:
-        return self._starting or bool(getattr(self._runner, "running", False)) or self._job is not None
+        return (self._starting or bool(getattr(self._runner, "running", False))
+                or self._job is not None or self._popup_busy())
 
     def _require_reference_mutation_locked(self) -> None:
         if self._game_id != "adopt" or self._busy_locked() or bool(getattr(self._runner, "cleanup_failed", False)):
@@ -800,6 +1021,10 @@ class DesktopController:
             return False
         if self._mode == "dry":
             return True
+        if (self._replay_service is not None
+                and self._replay_service.poll()["settings"].get("enabled") is True
+                and self._content_calibration is None):
+            return False
         return bool(self._selected_id and self._acknowledged and self._readiness_phase == "ready")
 
     def _area_payload(self) -> dict[str, int] | None:
@@ -809,7 +1034,7 @@ class DesktopController:
                 "width": int(self._area.width), "height": int(self._area.height)}
 
     def _geometry_phase(self) -> str:
-        if self._tracker.calibration is not None:
+        if self._content_calibration is not None:
             return "matched"
         if self._area is not None:
             return "historical"

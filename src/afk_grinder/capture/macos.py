@@ -69,7 +69,6 @@ class MacOSCapture:
         return self._binding_for_window(content, window, target)
 
     def capture(self, binding: WindowBinding) -> CapturedWindow:
-        started_at = monotonic()
         self._at_stage("initialization", self._require_roblox, binding.target)
         self._at_stage("preflight", self._preflight_screen_recording)
         content = self._at_stage("discovery", self._shareable_content)
@@ -80,6 +79,9 @@ class MacOSCapture:
         if current != binding:
             raise CaptureError("macOS window content geometry changed before capture.",
                                code="geometry", stage="frame_validation")
+        # Discovery may be slow. Age starts before acquisition, never after
+        # conversion, validation, IPC, or publication.
+        started_at = monotonic()
         image = self._at_stage("screenshot", self._capture_window_image, window, binding)
         width, height, pixels = self._at_stage("pixel_conversion", self._bgr8_pixels, image)
         if (width, height) != self._expected_pixels(binding):

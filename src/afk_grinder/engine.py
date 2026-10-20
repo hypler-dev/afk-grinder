@@ -4,8 +4,10 @@ from dataclasses import dataclass
 import queue
 import threading
 import time
+import math
+from typing import Callable
 
-from .models import Backend, Target, Workflow
+from .models import Backend, Step, Target, Workflow
 from .templates import COUNTDOWN_SECONDS, validate_workflow
 
 POLL_SECONDS = 0.02
@@ -19,6 +21,35 @@ class Status:
 
 class _Stopped(Exception):
     pass
+
+
+class GuardedInput:
+    """Internal routine capability; the web bridge never receives this object."""
+
+    def __init__(self, runner: "Runner", target: Target):
+        self._runner, self._target = runner, target
+
+    def guard(self) -> None:
+        if threading.current_thread() is not self._runner._thread:
+            raise RuntimeError("Routine capability is no longer active.")
+        self._runner._guard(self._target, False, focus=True)
+
+    def wait(self, seconds: float) -> None:
+        self.guard()
+        self._runner._wait(seconds, self._target, False)
+
+    def click(self, point: tuple[float, float], authorize: Callable[[], None]) -> None:
+        if (type(point) is not tuple or len(point) != 2
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in point)):
+            raise ValueError("Positioned click requires finite native coordinates.")
+        with self._runner._lock:
+            self.guard()
+            authorize()
+            self.guard()
+            self._runner._held_buttons.add("left")
+            self._runner.backend.mouse_down_at("left", *point)
+            self._runner.backend.mouse_up("left")
+            self._runner._held_buttons.remove("left")
 
 
 class Runner:
@@ -42,7 +73,8 @@ class Runner:
 
     def start(self, workflow: Workflow, *, target: Target | None = None,
               dry_run: bool = True, armed: bool = False,
-              cancel_event: threading.Event | None = None) -> None:
+              cancel_event: threading.Event | None = None,
+              _routine: Callable[[GuardedInput], None] | None = None) -> None:
         validate_workflow(workflow)
         with self._lock:
             if cancel_event is not None and cancel_event.is_set():
@@ -64,9 +96,16 @@ class Runner:
             self._start_cancel = cancel_event
             self._cancel.clear()
             self._thread = threading.Thread(target=self._run,
-                                            args=(workflow, target, dry_run),
+                                            args=(workflow, target, dry_run, _routine),
                                             name="input-runner", daemon=False)
             self._thread.start()
+
+    def start_routine(self, routine: Callable[[GuardedInput], None], *, target: Target,
+                      armed: bool, cancel_event: threading.Event) -> None:
+        if not callable(routine):
+            raise ValueError("A trusted application routine is required.")
+        self.start(Workflow("Approved popup recovery", (Step("wait", 1),)), target=target,
+                   dry_run=False, armed=armed, cancel_event=cancel_event, _routine=routine)
 
     def stop(self) -> None:
         # Serialize cancellation with acquisition so no new press starts after stop returns.
@@ -120,7 +159,8 @@ class Runner:
                 failures.append(f"Could not release {button} mouse button.")
         return failures
 
-    def _run(self, workflow: Workflow, target: Target | None, dry_run: bool) -> None:
+    def _run(self, workflow: Workflow, target: Target | None, dry_run: bool,
+             routine: Callable[[GuardedInput], None] | None = None) -> None:
         self._deadline = time.monotonic() + 30.0
         outcome = Status("completed", "Dry run complete; no OS input sent." if dry_run
                          else "Run complete. Held inputs released.")
@@ -130,6 +170,11 @@ class Runner:
                     "Dry run: no input will be sent." if dry_run else "Focus the bound Roblox window. Escape stops.")))
                 self._wait(COUNTDOWN_SECONDS / 3, target, dry_run, focus=False)
             self._guard(target, dry_run, focus=True)
+            if routine is not None:
+                assert target is not None and not dry_run
+                self.events.put(Status("running", "Checking approved popup response."))
+                routine(GuardedInput(self, target))
+                return
             for index, step in enumerate(workflow.steps, 1):
                 self._guard(target, dry_run, focus=True)
                 self.events.put(Status("running", f"Step {index}/{len(workflow.steps)}: {step.action}"))

@@ -30,6 +30,8 @@ venv/
 
 # Local recordings, captures, profiles, and logs
 recordings/
+replay/
+training-data/
 captures/
 local-profiles/
 *.log

@@ -512,6 +512,11 @@
       "file": "CFFI-2.1.1-Windows-libffi-notices.txt",
       "sha256": "771bd1500429004c08c1fc856f63e94a75554a52c82abc7801620dc80c0587ba",
       "source": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz: src/c/libffi_x86_x64 source-header notices; archive sha256 dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
+    },
+    {
+      "file": "Pillow-13.0.0.txt",
+      "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce",
+      "source": "Pillow 13.0.0 official PyPI wheel, pillow-13.0.0.dist-info/licenses/LICENSE; https://pypi.org/project/pillow/13.0.0/"
     }
   ]
 }

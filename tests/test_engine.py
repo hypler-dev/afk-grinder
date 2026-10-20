@@ -50,11 +50,43 @@ class FakeBackend:
         self.press.set()
         self.on_down()
 
+    def mouse_down_at(self, button, x, y):
+        self.calls.append(("mouse_down_at", button, x, y))
+        self.on_down()
+        if self.raise_down:
+            raise RuntimeError("Injection failed")
+
     def mouse_up(self, button):
         self.calls.append(("mouse_up", button))
 
 
 class RunnerTests(unittest.TestCase):
+    def test_guarded_positioned_click_tracks_before_post_and_releases_on_error(self):
+        self.backend.raise_down = True
+        self.runner.start_routine(lambda capability: capability.click((10., 20.), lambda: None),
+                                  target=TARGET, armed=True, cancel_event=threading.Event())
+        self.runner.join(1)
+        self.assertEqual(self.backend.calls, [("mouse_down_at", "left", 10., 20.), ("mouse_up", "left")])
+        self.assertFalse(self.runner.running)
+
+    def test_guarded_click_cannot_run_after_focus_loss_or_cancel_and_capability_cannot_escape(self):
+        for mode in ("focus", "cancel"):
+            with self.subTest(mode=mode):
+                ticket = threading.Event()
+                saved = []
+                def routine(capability):
+                    saved.append(capability)
+                    if mode == "focus":
+                        self.backend.focus = OTHER
+                    else:
+                        ticket.set()
+                    capability.click((10., 20.), lambda: None)
+                self.backend.focus = TARGET
+                self.runner.start_routine(routine, target=TARGET, armed=True, cancel_event=ticket)
+                self.runner.join(1)
+                self.assertEqual(self.backend.calls, [])
+                with self.assertRaisesRegex(RuntimeError, "no longer active"):
+                    saved[0].click((10., 20.), lambda: None)
     def test_start_ticket_canceled_during_readiness_cannot_send_input(self):
         entered, release, canceled = threading.Event(), threading.Event(), threading.Event()
         def readiness():

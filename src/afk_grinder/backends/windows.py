@@ -7,6 +7,7 @@ and SendInput in the Microsoft Win32 documentation.
 from __future__ import annotations
 
 import ntpath
+import math
 import sys
 from typing import Any
 
@@ -29,6 +30,15 @@ class WindowsBackend:
     _MOUSEEVENTF_LEFTUP = 0x0004
     _MOUSEEVENTF_RIGHTDOWN = 0x0008
     _MOUSEEVENTF_RIGHTUP = 0x0010
+    _MOUSEEVENTF_MOVE = 0x0001
+    _MOUSEEVENTF_VIRTUALDESK = 0x4000
+    _MOUSEEVENTF_ABSOLUTE = 0x8000
+    _SM_XVIRTUALSCREEN = 76
+    _SM_YVIRTUALSCREEN = 77
+    _SM_CXVIRTUALSCREEN = 78
+    _SM_CYVIRTUALSCREEN = 79
+    _DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
+    _ABSOLUTE_MAXIMUM = 65535
 
     _KEY_CODES = {
         "w": 0x57,
@@ -130,6 +140,16 @@ class WindowsBackend:
             ctypes.c_int,
         ]
         self._user32.SendInput.restype = wintypes.UINT
+        get_system_metrics = getattr(self._user32, "GetSystemMetrics", None)
+        if callable(get_system_metrics):
+            get_system_metrics.argtypes = [ctypes.c_int]
+            get_system_metrics.restype = ctypes.c_int
+        set_thread_dpi_awareness_context = getattr(
+            self._user32, "SetThreadDpiAwarenessContext", None
+        )
+        if callable(set_thread_dpi_awareness_context):
+            set_thread_dpi_awareness_context.argtypes = [ctypes.c_void_p]
+            set_thread_dpi_awareness_context.restype = ctypes.c_void_p
         self._kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         self._kernel32.OpenProcess.restype = wintypes.HANDLE
         self._kernel32.QueryFullProcessImageNameW.argtypes = [
@@ -296,6 +316,36 @@ class WindowsBackend:
     def mouse_down(self, button: str) -> None:
         self._send_mouse(button, is_mouse_up=False)
 
+    def mouse_down_at(self, button: str, x: float, y: float) -> None:
+        """Move and press in one virtual-desktop absolute input record."""
+        self._validate_button(button)
+        self._validate_native_point(x, y)
+        origin_x, origin_y, width, height = self._virtual_desktop_metrics()
+        maximum_x = origin_x + width - 1
+        maximum_y = origin_y + height - 1
+        if not origin_x <= x <= maximum_x or not origin_y <= y <= maximum_y:
+            raise ValueError("Native mouse coordinate is outside the virtual desktop.")
+        dx = self._normalize_absolute_coordinate(x, origin_x, width)
+        dy = self._normalize_absolute_coordinate(y, origin_y, height)
+        button_flag = {
+            "left": self._MOUSEEVENTF_LEFTDOWN,
+            "right": self._MOUSEEVENTF_RIGHTDOWN,
+        }[button]
+        record = self._INPUT()
+        record.type = self._INPUT_MOUSE
+        record.mi = self._MOUSEINPUT(
+            dx,
+            dy,
+            0,
+            self._MOUSEEVENTF_MOVE
+            | self._MOUSEEVENTF_ABSOLUTE
+            | self._MOUSEEVENTF_VIRTUALDESK
+            | button_flag,
+            0,
+            0,
+        )
+        self._send_input(record, f"mouse_down_at({button!r}, {x!r}, {y!r})")
+
     def mouse_up(self, button: str) -> None:
         self._send_mouse(button, is_mouse_up=True)
 
@@ -333,6 +383,66 @@ class WindowsBackend:
                 f"Windows SendInput {operation} failed: sent {sent} of 1 input ({detail})."
             )
 
+    def _virtual_desktop_metrics(self) -> tuple[int, int, int, int]:
+        set_context = getattr(self._user32, "SetThreadDpiAwarenessContext", None)
+        get_metrics = getattr(self._user32, "GetSystemMetrics", None)
+        if not callable(set_context):
+            raise RuntimeError(
+                "Windows positioned mouse unavailable: "
+                "SetThreadDpiAwarenessContext is unavailable."
+            )
+        if not callable(get_metrics):
+            raise RuntimeError(
+                "Windows positioned mouse unavailable: GetSystemMetrics is unavailable."
+            )
+        try:
+            prior_context = set_context(self._DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
+        except Exception as error:
+            raise RuntimeError(
+                "Windows positioned mouse unavailable: "
+                f"SetThreadDpiAwarenessContext failed: {error}"
+            ) from error
+        if not prior_context:
+            raise RuntimeError(
+                "Windows positioned mouse unavailable: "
+                "SetThreadDpiAwarenessContext returned no prior context."
+            )
+        try:
+            origin_x = int(get_metrics(self._SM_XVIRTUALSCREEN))
+            origin_y = int(get_metrics(self._SM_YVIRTUALSCREEN))
+            width = int(get_metrics(self._SM_CXVIRTUALSCREEN))
+            height = int(get_metrics(self._SM_CYVIRTUALSCREEN))
+            if width <= 1 or height <= 1:
+                raise RuntimeError(
+                    "Windows positioned mouse unavailable: "
+                    "virtual desktop dimensions must both exceed one pixel."
+                )
+            return origin_x, origin_y, width, height
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(
+                "Windows positioned mouse unavailable: GetSystemMetrics failed: "
+                f"{error}"
+            ) from error
+        finally:
+            try:
+                restored_context = set_context(prior_context)
+            except Exception as error:
+                raise RuntimeError(
+                    "Windows positioned mouse unavailable: "
+                    f"could not restore thread DPI awareness context: {error}"
+                ) from error
+            if not restored_context:
+                raise RuntimeError(
+                    "Windows positioned mouse unavailable: "
+                    "could not restore thread DPI awareness context."
+                )
+
+    @classmethod
+    def _normalize_absolute_coordinate(cls, coordinate: float, origin: int, size: int) -> int:
+        return round((coordinate - origin) * cls._ABSOLUTE_MAXIMUM / (size - 1))
+
     @staticmethod
     def _validate_key(key: str) -> None:
         if key not in KEYS:
@@ -344,3 +454,11 @@ class WindowsBackend:
             raise ValueError(
                 f"Unsupported mouse button {button!r}; allowed buttons: {', '.join(sorted(BUTTONS))}."
             )
+
+    @staticmethod
+    def _validate_native_point(x: float, y: float) -> None:
+        for name, value in (("x", x), ("y", y)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"Native mouse coordinate {name} must be a finite number.")
+            if not math.isfinite(value):
+                raise ValueError(f"Native mouse coordinate {name} must be finite.")

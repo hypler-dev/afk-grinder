@@ -6,9 +6,9 @@
 
 A free, MIT-licensed Windows/macOS application in development for local Roblox automation, starting with Adopt Me. The implemented baseline is still a supervised input prototype; [BUILD.md](BUILD.md) defines the recognition and care-routine roadmap.
 
-**Current state:** a native dark game-library launcher with automatic Roblox discovery, deterministic keyboard/mouse playback, cancellation, emergency-stop checks, and responsive interface scaling. Exact-revision source `13fa0832b60021445a27b0d8c167e5a6ed7705f1` passed all three hosted Windows x64/macOS Apple Silicon/Intel jobs, and downloadable test artifacts were downloaded and verified. The bundled template tests movement controls; it does not complete Adopt Me tasks. Native capture, live Roblox gameplay, representative player hardware, clean-machine installation, production installers, and assistive-technology acceptance are not yet validated.
+**Current state:** a native dark game-library launcher with automatic Roblox discovery, deterministic keyboard/mouse playback, cancellation, emergency-stop checks, responsive interface scaling, narrow local popup checks, and opt-in local replay storage. The trusted native baseline is source `c35a02fb5bfc32ecf37dcc2b1912bf751b2620fa`: its Mac candidate passed private capture plus supervised movement, focus-loss cancellation/no-resume, Escape cancellation/no-resume, and held-input cleanup. The latest SDK-free CI source receipt is `0b479dd4631ad1f8da05c5f3ba25d4b6e0a63be4`; it is a source/build receipt, not new native gameplay evidence. New calibration, popup, replay, and model paths remain unverified on native hosts.
 
-**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. The input path does not capture screenshots. The optional Setup preview keeps selected-window frames in memory; native capture and game recognition acceptance remain pending.
+**No runtime multimodal LLM, cloud inference, API key, login automation, or credential storage.** Roblox sign-in stays manual. The active popup OCR path is optional private Maa CPU OCR using the pinned PP-OCR v3 English detector and PP-OCR v4 English recognizer/dictionary; developer-fetched models are validated locally and never downloaded by the application. Qwen3.5-4B is only a future local multimodal authoring/evaluation candidate; no VLM is installed or run. Replay is opt-in and off by default: it stores only privacy-processed, reduced-resolution selected-window frames in a private local SQLite-backed store. Login and unknown frames become opaque placeholders; purchase and trade frames are strongly blurred before encoding or disk write.
 
 ## License and use at your own risk
 
@@ -79,9 +79,15 @@ uv run --locked --extra build --extra recognition python -m afk_grinder --sdk-ch
 
 This checks MaaFw 5.14.3 with synthetic pixels only, CPU configuration, privacy settings, a controller that rejects input, and cancellation. It captures no windows and performs no gameplay actions. The diagnostic runs in a disposable process with a 15-second deadline. No LLM is needed.
 
-CI is configured to verify SDK loading in source and frozen applications on all three desktop targets, then rebuild the downloadable prototype without the optional SDK. [Run 39425375723](https://github.com/hypler-dev/afk-grinder/actions/runs/39425375723) passed all three jobs on source `13fa0832b60021445a27b0d8c167e5a6ed7705f1`; its six application/SDK-inventory JSON artifacts were downloaded and verified against exact source and target metadata. SDK-bearing artifact publication remains blocked until its source/notice distribution audit is complete. [Dependency evidence](docs/DEPENDENCIES.md) tracks this work.
+CI is configured to verify SDK loading in source and frozen applications on all three desktop targets, then rebuild the downloadable prototype without the optional SDK. The latest SDK-free receipt is [run 39482108328](https://github.com/hypler-dev/afk-grinder/actions/runs/39482108328) for source `0b479dd4631ad1f8da05c5f3ba25d4b6e0a63be4`; its application and SDK-inventory records were downloaded and verified against exact source and target metadata. SDK-bearing artifact publication remains blocked until its source/notice distribution audit is complete. [Dependency evidence](docs/DEPENDENCIES.md) tracks this work.
 
 Open **Setup** to see automatic Roblox discovery, access status and the optional window preview. One verified running player binds automatically; multiple players require a choice. No foreground-switch countdown is needed for binding, and binding sends no input. Capture requires an explicit click. macOS capture requires macOS 14+ and Screen Recording permission for the exact application identity; access is never requested silently. Raw Mac window bounds remain unverified. Preview errors display bounded reason/stage/type codes. Capture and reference geometry never enable care routines or bypass input safeguards.
+
+For content calibration, drag or enter any positive in-bounds physical-pixel rectangle that contains only Roblox game content. Confirm the UI checkbox that the selected box contains only Roblox game content, then check the area; the app discards old pixels and captures a fresh frame with the exact same target, window, bounds, monitor, size, scale, and region metadata. The crop preserves arbitrary aspect ratios and never stretches pixels. Calibration is manual evidence only; no automatic content detector or gameplay claim exists.
+
+After calibration, **Popup check** performs local OCR/model recognition without input. The current Adopt Me allowlist recognizes only the play-time reward bank dialog and known idle/connection disconnect dialogs. **Popup resolve** permits at most one bounded click after two fresh stable observations, then requires two fresh frames in which the old dialog is no longer recognized. Purchase, trade, login, security/restricted, unknown, conflicting, or unsupported screens block. Reconnect recovery is opt-in, applies only to the recognized reconnectable dialog, never logs in or resumes an old queue, and leaves input stopped pending fresh discovery.
+
+**Replay** is a local opt-in setting. Defaults are off, seven-day retention, WebP, 960-pixel maximum width, quality 60, a two-second interval, and a 2 GiB disk cap. Settings are persisted only after an explicit change. The recorder queues a raw in-memory crop to the local store worker; the store applies the opaque placeholder or strong blur before encoding or disk write, and the queue does not persist raw frames. Replay history uses bounded session/frame pagination and deletion controls; bridge state exposes replay settings and metadata/opaque IDs, never filesystem paths or frame data URLs. Login, unknown, restricted, purchase, and trade frames are privacy processed now; ordinary gameplay has no clear classification yet and therefore is recorded only as an opaque placeholder.
 
 Use **Interface** and choose a direct 100%, 125%, 150%, 175%, or 200% menu item. The launcher adapts to small and large desktop windows, keeps navigation and emergency **Stop** reachable, wraps long statuses and Settings values, and preserves source-pixel preview geometry while the window or interface scales. Zoom and resize do not change the selected source area, arm input, or clear safety state.
 
@@ -94,13 +100,13 @@ Use **Interface** and choose a direct 100%, 125%, 150%, 175%, or 200% menu item.
 5. Review the short routine; its optional JSON editor is under **Routines**. Confirm manual login/gameplay readiness, click Start in **Session**, and switch to the bound Roblox window during the three-second countdown.
 6. Press **Escape** to stop live execution. Clicking Stop or closing the prototype also cancels. Switching away from the bound target during playback stops the run; it never resumes automatically.
 
-The default template holds W for 250 ms, waits 500 ms, and holds S for 250 ms. It is an input test, not a route or AFK grind routine. It has not been proven to work inside Roblox. Each live run consumes its acknowledgment; review the scene again before another run.
+The default template holds W for 250 ms, waits 500 ms, and holds S for 250 ms. It is an input test, not a route or AFK grind routine. This exact sequence remains untested in Roblox; only the separately recorded controlled movement, focus-loss, Escape, and cleanup checks on the trusted `c35a02f` candidate are verified. Each live run consumes its acknowledgment; review the scene again before another run.
 
 For the bounded movement, focus-loss, and physical Escape checks, follow [the supervised Mac test procedure](docs/MAC_LIVE_TEST.md). Fake-backend tests and green CI do not replace these live-game observations.
 
 ## Edit actions
 
-Edit workflow JSON under **Routines → Advanced template**. Copy the JSON to a local file to save it; the prototype has no recorder or import/export controls yet. Templates are data, not executable code:
+Edit workflow JSON under **Routines → Advanced template**. Copy the JSON to a local file to save it; the prototype has no action recorder or import/export controls yet. Templates are data, not executable code:
 
 ```json
 {
@@ -116,14 +122,20 @@ Edit workflow JSON under **Routines → Advanced template**. Copy the JSON to a 
 
 Allowed keys: `w`, `a`, `s`, `d`, `e`, `space`, `up`, `down`, `left`, `right`. Mouse clicks use the current pointer position and release after 80 ms. There is no pointer positioning, text entry, login action, looping, or script execution. Holds/waits are 1-5000 ms; at most 100 steps and 27 seconds of actions plus the three-second countdown. A wall-clock guard stops late runs, subject to native-call and OS scheduling latency.
 
+## Local recognition and replay limits
+
+The active popup OCR runs through a private CPU worker using the pinned Maa PP-OCR v3 English detector plus PP-OCR v4 English recognizer/dictionary. Model files are developer-fetched and hash-checked; the application performs no downloads. Future local multimodal authoring evaluation starts with Qwen3.5-4B; it is not active OCR, no VLM is installed or run, and it cannot authorize input, execute code, change safety gates, or approve itself. Model setup, training-packet schema, held-out evaluation, and human approval are documented in [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) and [TRAINING_PACKETS.md](docs/TRAINING_PACKETS.md).
+
+Replay data stays local and is never uploaded or reused for training by default. The recorder stops on focus loss, Escape, cancellation, capture/calibration failure, or protected content. The recorder may queue a raw in-memory crop, but the store applies masking before encoding or persistence; an unmasked sensitive or unknown frame is never encoded or persisted.
+
 ## Safety limits
 
 - Focus and Escape checks run before acquisitions and at intervals up to 20 ms during waits, subject to OS scheduling. This is not a real-time guarantee and short Escape taps can be missed; hold Escape until the run stops.
 - The runner tracks each acquired key/button before posting it and attempts release on completion, focus loss, cancellation, and errors. Release failures are displayed and block later live runs until restart and manual input-state verification.
 - Killing/crashing the process, OS failure, or revoked posting permissions can prevent cleanup. The application cannot guarantee release in those cases.
 - Input goes through global OS APIs. Focus checking and event posting cannot be atomic; a small check-to-send race remains. The app never forces focus or injects into background windows.
-- Process identity is a prototype allowlist, not a code-signature trust check. Focus cannot distinguish gameplay, login, chat, purchases, or menus inside Roblox. The user must remain present and stop if the screen changes. Authentication-screen recognition is not implemented.
-- Do not use this supervised prototype for unattended AFK sessions. Screenshots, credentials, session tokens, and arbitrary key activity are neither collected nor stored.
+- Process identity is a prototype allowlist, not a code-signature trust check. Focus alone cannot distinguish gameplay, login, chat, purchases, or menus inside Roblox. The user must remain present and stop if the screen changes. The narrow local popup recognizer blocks protected and unknown screens; it does not establish gameplay readiness.
+- Do not use this supervised prototype for unattended AFK sessions. Credentials, session tokens, and arbitrary key activity are neither collected nor stored. Replay is a separate explicit opt-in and applies privacy processing before compression or persistence.
 
 Windows uses Win32 foreground/process identity APIs and `SendInput`; input can be blocked by privilege differences or rejected by the game. Do not run as administrator to work around failures. macOS uses AppKit, ApplicationServices, and Quartz. Native API success does not prove that Roblox consumed an event. See [Microsoft SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput) and [PyObjC framework notes](https://pyobjc.readthedocs.io/en/latest/notes/framework-wrappers.html).
 
@@ -181,7 +193,7 @@ Unit tests use fake adapters and send no OS input. Before claiming support, test
 | Linux | Excluded; [Roblox does not officially support it](https://en.help.roblox.com/hc/en-us/articles/203312800-Computer-Hardware-Operating-System-Requirements) |
 | iOS / Android | Feasibility research only; no implementation commitment |
 
-Next gates follow BUILD.md: verified window capture and guided Adopt Me calibration, visual checkpoints, guarded care routines, then longer-session evidence and production distribution. Recording and a visual action editor are not prerequisites. Research mobile input/capture restrictions, permissions, distribution rules, privacy, and stop controls separately. A shared framework alone does not establish mobile automation feasibility.
+Next gates follow BUILD.md: native acceptance of the current calibration, popup, privacy, replay, and local-model paths; verified window capture and guided Adopt Me calibration; visual checkpoints; guarded care routines; then longer-session evidence and production distribution. Normal gameplay clear recording remains unverified. A visual action editor is not a prerequisite. Research mobile input/capture restrictions, permissions, distribution rules, privacy, and stop controls separately. A shared framework alone does not establish mobile automation feasibility.
 
 Roblox prohibits cheating/exploits and disruptive automation; permission for this particular use in Adopt Me has not been established. See [Roblox Community Standards](https://en.help.roblox.com/hc/en-us/articles/203313410-Roblox-Community-Standards) and [Adopt Me support](https://www.playadopt.me/support). Client injection, memory access, anti-cheat bypass, automated purchases, and trades remain excluded.
 

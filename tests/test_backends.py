@@ -104,6 +104,8 @@ class FakeQuartz:
         self.listen = listen
         self.post = post
         self.keyboard_event: object | None = object()
+        self.mouse_event: object | None = object()
+        self.mouse_event_requests: list[tuple[object, object, object, object]] = []
         self.posted: list[object] = []
         self.post_error: Exception | None = None
         self.escape = False
@@ -124,6 +126,10 @@ class FakeQuartz:
 
     def CGEventCreateKeyboardEvent(self, source, key_code, down):
         return self.keyboard_event
+
+    def CGEventCreateMouseEvent(self, source, event_type, location, mouse_button):
+        self.mouse_event_requests.append((source, event_type, location, mouse_button))
+        return self.mouse_event
 
     def CGEventPost(self, tap, event) -> None:
         if self.post_error is not None:
@@ -146,6 +152,28 @@ def fake_macos_backend(
 
 
 class MacOSBackendTests(unittest.TestCase):
+    def test_mouse_down_at_posts_exact_supplied_point(self) -> None:
+        backend, quartz, _, _ = fake_macos_backend()
+
+        backend.mouse_down_at("right", 12.5, 99.25)
+
+        self.assertEqual(
+            quartz.mouse_event_requests,
+            [(None, quartz.kCGEventRightMouseDown, (12.5, 99.25), quartz.kCGMouseButtonRight)],
+        )
+        self.assertEqual(quartz.posted, [quartz.mouse_event])
+
+    def test_mouse_down_at_rejects_invalid_values_before_native_event(self) -> None:
+        backend, quartz, _, _ = fake_macos_backend()
+
+        for button, x, y in (("middle", 1.0, 2.0), ("left", True, 2.0), ("left", 1.0, float("nan"))):
+            with self.subTest(button=button, x=x, y=y):
+                with self.assertRaises(ValueError):
+                    backend.mouse_down_at(button, x, y)
+
+        self.assertEqual(quartz.mouse_event_requests, [])
+        self.assertEqual(quartz.posted, [])
+
     def test_escape_state_and_fail_closed_errors(self) -> None:
         backend, quartz, _, _ = fake_macos_backend()
         self.assertFalse(backend.escape_pressed())
@@ -266,6 +294,139 @@ class MacOSBackendTests(unittest.TestCase):
 
 
 class WindowsBackendTests(unittest.TestCase):
+    def _positioned_backend(self, metrics: dict[int, int] | None = None):
+        backend = object.__new__(WindowsBackend)
+        captured: list[tuple[object, str]] = []
+        contexts: list[object] = []
+
+        class User32:
+            def SetThreadDpiAwarenessContext(self, context):
+                contexts.append(context)
+                return 101 if context == -4 else 202
+
+            def GetSystemMetrics(self, metric):
+                return (metrics or {76: -100, 77: -50, 78: 300, 79: 200})[metric]
+
+        class Input:
+            def __init__(self) -> None:
+                self.type = 0
+                self.mi = None
+
+        backend._user32 = User32()
+        backend._INPUT = Input
+        backend._MOUSEINPUT = lambda *values: values
+        backend._send_input = lambda record, operation: captured.append((record, operation))
+        return backend, captured, contexts
+
+    def test_mouse_down_at_normalizes_virtual_desktop_edges_and_restores_context(self) -> None:
+        backend, captured, contexts = self._positioned_backend()
+
+        backend.mouse_down_at("left", -100.0, -50.0)
+        backend.mouse_down_at("right", 199.0, 149.0)
+
+        self.assertEqual(captured[0][0].mi[:2], (0, 0))
+        self.assertEqual(captured[1][0].mi[:2], (65535, 65535))
+        expected_flags = (
+            backend._MOUSEEVENTF_MOVE
+            | backend._MOUSEEVENTF_ABSOLUTE
+            | backend._MOUSEEVENTF_VIRTUALDESK
+        )
+        self.assertEqual(captured[0][0].mi[3], expected_flags | backend._MOUSEEVENTF_LEFTDOWN)
+        self.assertEqual(captured[1][0].mi[3], expected_flags | backend._MOUSEEVENTF_RIGHTDOWN)
+        self.assertEqual(contexts, [-4, 101, -4, 101])
+
+    def test_mouse_down_at_restores_context_after_metric_error_and_sends_no_event(self) -> None:
+        backend, captured, contexts = self._positioned_backend()
+
+        def metric_failure(metric):
+            raise OSError("bad metric")
+
+        backend._user32.GetSystemMetrics = metric_failure
+
+        with self.assertRaisesRegex(RuntimeError, "GetSystemMetrics failed"):
+            backend.mouse_down_at("left", 1.0, 1.0)
+
+        self.assertEqual(contexts, [-4, 101])
+        self.assertEqual(captured, [])
+
+    def test_mouse_down_at_fails_closed_for_missing_context_and_invalid_bounds(self) -> None:
+        backend, captured, contexts = self._positioned_backend()
+        backend._user32.SetThreadDpiAwarenessContext = None
+
+        with self.assertRaisesRegex(RuntimeError, "SetThreadDpiAwarenessContext is unavailable"):
+            backend.mouse_down_at("left", 1.0, 1.0)
+
+        self.assertEqual(contexts, [])
+        self.assertEqual(captured, [])
+
+        backend, captured, contexts = self._positioned_backend()
+        with self.assertRaisesRegex(ValueError, "outside the virtual desktop"):
+            backend.mouse_down_at("left", -101.0, -50.0)
+
+        self.assertEqual(contexts, [-4, 101])
+        self.assertEqual(captured, [])
+
+    def test_mouse_down_at_rejects_invalid_values_without_native_calls(self) -> None:
+        backend, captured, contexts = self._positioned_backend()
+
+        for button, x, y in (("middle", 1.0, 2.0), ("left", True, 2.0), ("left", 1.0, float("inf"))):
+            with self.subTest(button=button, x=x, y=y):
+                with self.assertRaises(ValueError):
+                    backend.mouse_down_at(button, x, y)
+
+        self.assertEqual(contexts, [])
+        self.assertEqual(captured, [])
+
+    def test_send_input_failure_is_explicit(self) -> None:
+        backend = object.__new__(WindowsBackend)
+
+        class User32:
+            @staticmethod
+            def SendInput(count, pointer, size):
+                return 0
+
+        class Ctypes:
+            @staticmethod
+            def byref(record):
+                return record
+
+            @staticmethod
+            def sizeof(record):
+                return 1
+
+            @staticmethod
+            def get_last_error():
+                return 5
+
+            @staticmethod
+            def FormatError(error):
+                return "access denied"
+
+        backend._user32 = User32()
+        backend._ctypes = Ctypes()
+
+        with self.assertRaisesRegex(RuntimeError, "sent 0 of 1 input.*access denied"):
+            backend._send_input(object(), "mouse_down_at('left', 1.0, 2.0)")
+
+    def test_legacy_mouse_buttons_keep_button_only_flags(self) -> None:
+        backend = object.__new__(WindowsBackend)
+        captured: list[object] = []
+
+        class Input:
+            def __init__(self) -> None:
+                self.type = 0
+                self.mi = None
+
+        backend._INPUT = Input
+        backend._MOUSEINPUT = lambda *values: values
+        backend._send_input = lambda record, operation: captured.append(record)
+
+        backend.mouse_down("left")
+        backend.mouse_up("right")
+
+        self.assertEqual(captured[0].mi, (0, 0, 0, backend._MOUSEEVENTF_LEFTDOWN, 0, 0))
+        self.assertEqual(captured[1].mi, (0, 0, 0, backend._MOUSEEVENTF_RIGHTUP, 0, 0))
+
     def test_arrow_keys_set_extended_flag(self) -> None:
         backend = object.__new__(WindowsBackend)
         captured: list[object] = []

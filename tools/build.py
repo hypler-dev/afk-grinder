@@ -47,10 +47,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--with-recognition", action="store_true",
                         help="Build a local SDK diagnostic bundle; not approved for redistribution yet")
+    parser.add_argument("--with-popup-models", action="store_true",
+                        help="Include pinned developer-fetched OCR assets in a private recognition build")
     args = parser.parse_args()
     if sys.platform not in {"darwin", "win32"}:
         raise SystemExit("Only Windows and macOS builds are supported.")
     root = Path(__file__).resolve().parents[1]
+    if args.with_popup_models and not args.with_recognition:
+        parser.error("--with-popup-models requires --with-recognition and is private-build only")
     runtime_legal = root / "build" / "runtime-legal"
     build_info = write_build_info(root)
     collect(runtime_legal)
@@ -73,6 +77,12 @@ def main() -> None:
                     "--exclude-module", "MaaAgentBinary"]
         for module in ("maa.library", "maa.tasker", "maa.resource", "maa.controller", "maa.define"):
             command += ["--hidden-import", module]
+        for module in ("maa.pipeline", "numpy"):
+            command += ["--hidden-import", module]
+        if args.with_popup_models:
+            from afk_grinder.recognition.ocr_models import model_directory, validate_models
+            models = validate_models(model_directory())
+            command += ["--add-data", f"{models}{os.pathsep}afk_grinder/ocr_models"]
     else:
         command += ["--exclude-module", "maa", "--exclude-module", "MaaAgentBinary",
                     "--exclude-module", "numpy", "--exclude-module", "strenum"]

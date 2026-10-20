@@ -36,6 +36,12 @@ PyObjC's MIT license comes from official v12.2.2 commit `38cdf73fc049ef2d176973e
 
 Source retains upstream Python, Tk, PyObjC, PyInstaller and recognition notices. Builds also copy their actual Python runtime license and installed baseline dependency notices into `legal/build-runtime` inside the application. The generated inventory describes installed build dependencies, not proof every package is bundled. SDK notices in source do not mean SDK binaries are in downloadable artifacts.
 
+## Local replay and private OCR assets
+
+Pillow 13.0.0 is pinned for reduced-resolution WebP/JPEG encoding. Its MIT-CMU notice, including bundled component notices, is retained in `licenses/Pillow-13.0.0.txt` with a hash in the notice inventory. The actual installed notice also ships through the build legal collector. Recording defaults off; compression does not authorize capture or input.
+
+Private popup tests use English PaddleOCR model files from MaaCommonAssets commit `dabcd4681ac990dc4361de26416d986abd80e4aa`: the v3 English detector with v4 English recognizer and dictionary, as documented by upstream. Exact file sizes and SHA-256 values are pinned in `recognition/ocr_models.py`. The explicit developer fetch tool uses fixed HTTPS URLs and verifies every asset. The application performs no model downloads. Repository licensing is not treated as blanket approval for redistributing every model weight. Models remain ignored local data; `--with-popup-models` requires a private SDK build, and neither models nor SDK-bearing bundles enter default downloads. Their upstream weight/source/notice distribution review remains open.
+
 ## Local WebView launcher dependencies
 
 The launcher pins pywebview 6.2.1 (BSD-3-Clause), Bottle 0.13.4 (MIT), proxy-tools 0.1.0 and typing_extensions 4.16.0 (Python Software Foundation license terms in the retained file). Mac adds PyObjC WebKit, Security and UniformTypeIdentifiers 12.2.2. The latter two framework wheels omit a separate notice; their official license files at the existing pinned PyObjC commit are byte-identical to `licenses/PyObjC-12.2.2.txt`. The WebKit wheel carries the same notice.

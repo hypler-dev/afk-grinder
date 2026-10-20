@@ -1,0 +1,23 @@
+{
+  "format": "afk-grinder-training",
+  "schema_version": 1,
+  "status": "draft",
+  "id": "adopt-me-draft",
+  "version": "0.1.0",
+  "game": {"id": "adopt-me", "title": "Adopt Me", "place_id": "920587237"},
+  "locale": "en",
+  "reference_size": [1920, 1080],
+  "states": [
+    {"id": "gameplay", "kind": "gameplay", "description": "Visible in-game play scene."},
+    {"id": "daily-reward-popup", "kind": "popup", "description": "Visible daily reward overlay."},
+    {"id": "trade-window", "kind": "transaction", "description": "Trade interface remains blocked."}
+  ],
+  "examples": [
+    {"id": "gameplay-001", "path": "examples/gameplay-001.webp", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "width": 1920, "height": 1080, "state_id": "gameplay", "split": "train", "origin": "synthetic"},
+    {"id": "reward-001", "path": "examples/reward-001.webp", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "width": 1920, "height": 1080, "state_id": "daily-reward-popup", "split": "validation", "origin": "synthetic"},
+    {"id": "gameplay-002", "path": "examples/gameplay-002.webp", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "width": 1920, "height": 1080, "state_id": "gameplay", "split": "held_out", "origin": "synthetic"}
+  ],
+  "demonstrations": [
+    {"id": "reward-overlay-review", "from_state": "gameplay", "to_state": "daily-reward-popup", "capability_request": "review-daily-reward", "example_ids": ["gameplay-001", "reward-001"], "max_duration_ms": 5000, "retry_limit": 1}
+  ]
+}

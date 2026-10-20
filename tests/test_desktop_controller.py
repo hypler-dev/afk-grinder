@@ -17,6 +17,8 @@ from afk_grinder.capture.service import JobResult
 from afk_grinder.desktop_controller import DesktopController
 from afk_grinder.engine import Status
 from afk_grinder.models import Target
+from afk_grinder.recognition.content_calibration import ContentCalibration
+from afk_grinder.recognition.frame_geometry import layout_from_capture
 
 
 TARGET_ONE = Target(11, "101", "RobloxPlayerBeta.exe", "win32")
@@ -42,6 +44,7 @@ class FakeRunner:
         self.cleanup_failed = False
         self.starts = []
         self.stops = 0
+        self.routines = []
 
     def start(self, workflow, *, target=None, dry_run=True, armed=False, cancel_event=None) -> None:
         if cancel_event is not None and cancel_event.is_set():
@@ -54,6 +57,10 @@ class FakeRunner:
     def stop(self) -> None:
         self.stops += 1
         self.running = False
+
+    def start_routine(self, routine, **kwargs):
+        self.routines.append((routine, kwargs))
+        self.running = True
 
 
 class FakeJob:
@@ -102,6 +109,111 @@ def frame(target=TARGET_ONE, *, captured_at=10.0, native_rect=(0, 0, 16, 9)) -> 
 
 
 class DesktopControllerTests(unittest.TestCase):
+    def test_recorder_starts_only_for_live_enabled_calibrated_session_and_ticket_is_scoped(self):
+        for mode, enabled, calibrated in (("dry", True, True), ("live", False, True),
+                                          ("live", True, False), ("live", True, True)):
+            with self.subTest(mode=mode, enabled=enabled, calibrated=calibrated):
+                controller = self.make_controller((TARGET_ONE,))
+                created = []
+                class Recorder:
+                    def __init__(self, **kwargs):
+                        created.append(kwargs)
+                    def start(self): pass
+                controller._recorder_factory = Recorder
+                controller._replay_service = SimpleNamespace(
+                    poll=lambda: {"settings": {"enabled": enabled}, "frame": None}, close=lambda: None)
+                controller.command("set_mode", {"mode": mode})
+                if calibrated:
+                    controller._content_calibration = ContentCalibration.manual(layout_from_capture(frame()), (0, 0, 16, 9))
+                controller.command("set_ack", {"acknowledged": True})
+                result = controller.command("start", {})
+                if mode == "live" and enabled and not calibrated:
+                    self.assertFalse(result["ok"])
+                    self.assertEqual(created, [])
+                    continue
+                self.assertTrue(result["ok"])
+                self.assertEqual(len(created), int(mode == "live" and enabled))
+                if created:
+                    ticket = created[0]["cancel"]
+                    self.assertIs(ticket, controller._start_cancel)
+                    self.assertTrue(created[0]["active"]())
+                    controller._start_cancel = threading.Event()
+                    self.assertFalse(created[0]["active"]())
+                    controller._start_cancel = ticket
+                    controller.command("stop", {})
+                    self.assertTrue(ticket.is_set())
+
+    def test_popup_bridge_live_gates_and_stop_ticket(self):
+        controller = self.make_controller((TARGET_ONE,))
+        controller._content_calibration = ContentCalibration.manual(layout_from_capture(frame()), (0, 0, 16, 9))
+        controller._popup_state = "bank_reward"
+        self.assertFalse(controller.command("popup_resolve", {})["ok"])
+        self.assertTrue(controller.command("set_mode", {"mode": "live"})["ok"])
+        for state in ("protected", "unknown", "error"):
+            controller._popup_state = state
+            self.assertFalse(controller.command("popup_resolve", {})["ok"])
+        controller._popup_state = "disconnected"
+        self.assertFalse(controller.command("popup_resolve", {})["ok"])
+        self.assertTrue(controller.command("set_reconnect", {"enabled": True})["ok"])
+        self.runner.cleanup_failed = True
+        self.assertFalse(controller.command("popup_resolve", {})["ok"])
+        self.runner.cleanup_failed = False
+        controller._readiness_phase = "blocked"
+        self.assertFalse(controller.command("popup_resolve", {})["ok"])
+        controller._readiness_phase = "ready"
+        self.assertTrue(controller.command("popup_resolve", {})["ok"])
+        self.assertEqual(len(self.runner.routines), 1)
+        _, kwargs = self.runner.routines[0]
+        self.assertEqual(kwargs["target"], TARGET_ONE)
+        self.assertTrue(kwargs["armed"])
+        self.assertFalse(kwargs["cancel_event"].is_set())
+        self.assertTrue(controller.command("stop", {})["ok"])
+        self.assertTrue(kwargs["cancel_event"].is_set())
+        self.assertEqual(controller.get_state()["popup"]["state"], "unknown")
+
+    def test_stop_revokes_popup_start_while_native_readiness_is_blocked(self):
+        controller = self.make_controller((TARGET_ONE,))
+        controller._content_calibration = ContentCalibration.manual(layout_from_capture(frame()), (0, 0, 16, 9))
+        controller._popup_state = "bank_reward"
+        controller.command("set_mode", {"mode": "live"})
+        entered, release = threading.Event(), threading.Event()
+        def blocked(routine, **kwargs):
+            entered.set()
+            release.wait(1)
+            if kwargs["cancel_event"].is_set():
+                raise RuntimeError("Canceled")
+            self.runner.routines.append((routine, kwargs))
+        self.runner.start_routine = blocked
+        response = []
+        thread = threading.Thread(target=lambda: response.append(controller.command("popup_resolve", {})))
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            self.assertTrue(controller.command("stop", {})["ok"])
+            self.assertTrue(controller._start_cancel.is_set())
+        finally:
+            release.set()
+            thread.join(1)
+        self.assertFalse(thread.is_alive())
+        self.assertFalse(response[0]["ok"])
+        self.assertEqual(self.runner.routines, [])
+
+    def test_replay_bridge_keeps_images_out_of_state_and_rejects_paths(self):
+        controller = self.make_controller((TARGET_ONE,))
+        fid = "a" * 32
+        commands = []
+        controller._replay_service = SimpleNamespace(poll=lambda: {
+            "settings": {}, "frame": {"frame_id": fid, "data_url": "data:image/webp;base64,ZmFrZQ=="}},
+            command=lambda *args: commands.append(args) or True, close=lambda: None)
+        self.assertNotIn("data_url", repr(controller.get_state()))
+        self.assertIn("data_url", controller.get_preview({"replay_frame_id": fid}))
+        self.assertIsNone(controller.get_preview({"replay_frame_id": "../private"}))
+        self.assertFalse(controller.command("replay_select", {"session_id": "../private"})["ok"])
+        self.assertFalse(controller.command("replay_settings", {"settings": {"enabled": True}})["ok"])
+        self.assertEqual(commands, [])
+        self.assertTrue(controller.command("replay_older", {"session_id": fid})["ok"])
+        self.assertTrue(controller.command("replay_sessions", {"older": True})["ok"])
+        self.assertEqual(commands, [("older", fid), ("sessions", True)])
     def test_background_refresh_keeps_ambiguous_choices_visible(self) -> None:
         controller = self.make_controller((TARGET_ONE, TARGET_TWO))
         before = controller.get_state()["binding"]
@@ -188,13 +300,14 @@ class DesktopControllerTests(unittest.TestCase):
     def test_expired_match_keeps_editable_image_but_invalidates_observation(self) -> None:
         controller = self.make_controller((TARGET_ONE,))
         preview_id = self.capture_reference(controller)
-        controller.command("check_area", {"preview_id": preview_id})
+        controller.command("check_area", {"preview_id": preview_id, "attested": True})
         self.jobs.jobs[-1][2].result = JobResult(frame=frame())
         self.assertEqual(controller.get_state()["preview"]["geometry"], "matched")
         self.clock.value = 10.6
         state = controller.get_state()
         self.assertEqual(state["preview"]["phase"], "historical")
-        self.assertEqual(state["preview"]["geometry"], "historical")
+        self.assertEqual(state["preview"]["geometry"], "matched")
+        self.assertIsNotNone(controller._content_calibration)
         self.assertIsNotNone(controller._preview_frame)
         self.assertIsNone(controller._tracker.latest)
         self.assertIsNone(controller._tracker.calibration)
@@ -206,7 +319,7 @@ class DesktopControllerTests(unittest.TestCase):
         controller = self.make_controller((TARGET_ONE,))
         preview_id = self.capture_reference(controller)
         self.clock.value = 10.6
-        controller.command("check_area", {"preview_id": preview_id})
+        controller.command("check_area", {"preview_id": preview_id, "attested": True})
         self.assertIsNone(controller._preview_frame)
         self.assertIsNone(controller._preview_layout)
         self.jobs.jobs[-1][2].result = JobResult(frame=frame())
@@ -399,19 +512,20 @@ class DesktopControllerTests(unittest.TestCase):
         state = controller.get_state()
         self.assertEqual(state["preview"]["phase"], "error")
 
-    def test_roi_is_16_by_9_and_exact_fresh_layout_calibrates(self) -> None:
+    def test_arbitrary_aspect_requires_attestation_and_fresh_exact_layout(self) -> None:
         controller = self.make_controller((TARGET_ONE,))
         self.assertTrue(controller.command("capture", {})["ok"])
         self.jobs.jobs[-1][2].result = JobResult(frame=frame())
         state = controller.get_state()
         preview_id = state["preview"]["id"]
         self.assertFalse(controller.command("set_area", {
-            "preview_id": preview_id, "rect": {"x": 0, "y": 0, "width": 10, "height": 9},
+            "preview_id": preview_id, "rect": {"x": 0, "y": 0, "width": 0, "height": 9},
         })["ok"])
         self.assertTrue(controller.command("set_area", {
             "preview_id": preview_id, "rect": {"x": 0, "y": 0, "width": 16, "height": 9},
         })["ok"])
-        self.assertTrue(controller.command("check_area", {"preview_id": preview_id})["ok"])
+        self.assertFalse(controller.command("check_area", {"preview_id": preview_id, "attested": False})["ok"])
+        self.assertTrue(controller.command("check_area", {"preview_id": preview_id, "attested": True})["ok"])
         self.jobs.jobs[-1][2].result = JobResult(frame=frame())
         self.assertEqual(controller.get_state()["preview"]["geometry"], "matched")
 
