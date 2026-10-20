@@ -67,9 +67,13 @@ class FakeWindowApplication:
 
 
 class FakeWindow:
-    def __init__(self, window_id: int, pid: int) -> None:
+    def __init__(self, window_id: int, pid: int, *, frame: FakeFrame | None = None,
+                 layer: int = 0, on_screen: bool = True) -> None:
         self.window_id = window_id
         self.application = FakeWindowApplication(pid)
+        self._frame = frame or FakeFrame(0, 0, 943, 632)
+        self._layer = layer
+        self._on_screen = on_screen
 
     def windowID(self) -> int:
         return self.window_id
@@ -78,7 +82,13 @@ class FakeWindow:
         return self.application
 
     def isOnScreen(self) -> bool:
-        return True
+        return self._on_screen
+
+    def windowLayer(self) -> int:
+        return self._layer
+
+    def frame(self) -> FakeFrame:
+        return self._frame
 
 
 class FakeContent:
@@ -374,6 +384,80 @@ class MacOSCaptureTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CaptureError, "replaced"):
             adapter._window_by_id_and_pid(adapter._shareable_content(), "700", 42)
+
+    def test_window_selection_chooses_only_qualified_roblox_window(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        tiny = FakeWindow(701, 42, frame=FakeFrame(0, 0, 66, 20))
+        valid = FakeWindow(700, 42)
+
+        self.assertIs(adapter._single_window_for_pid(FakeContent([tiny, valid]), 42), valid)
+
+    def test_window_selection_rejects_ambiguous_qualified_windows(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        content = FakeContent([FakeWindow(700, 42), FakeWindow(701, 42)])
+
+        with self.assertRaises(CaptureError) as raised:
+            adapter._single_window_for_pid(content, 42)
+        self.assertEqual(raised.exception.diagnostic.code, "window_count")
+
+    def test_window_selection_rejects_non_candidates(self) -> None:
+        cases = (
+            ("tiny", FakeWindow(700, 42, frame=FakeFrame(0, 0, 319, 240))),
+            ("short", FakeWindow(700, 42, frame=FakeFrame(0, 0, 320, 239))),
+            ("nonfinite", FakeWindow(700, 42, frame=FakeFrame(float("nan"), 0, 320, 240))),
+            ("nonfinite-width", FakeWindow(700, 42, frame=FakeFrame(0, 0, float("nan"), 240))),
+            ("layer", FakeWindow(700, 42, layer=1)),
+            ("nonfinite-layer", FakeWindow(700, 42, layer=float("nan"))),
+            ("offscreen", FakeWindow(700, 42, on_screen=False)),
+        )
+        for name, window in cases:
+            adapter = object.__new__(MacOSCapture)
+            adapter._preflight_screen_recording = lambda: None
+            adapter._shareable_content = lambda: FakeContent([window])
+            adapter._binding_for_window = Mock()
+            with self.subTest(name=name), self.assertRaises(CaptureError) as raised:
+                adapter.discover(TARGET)
+            self.assertEqual(raised.exception.diagnostic.code, "window_missing")
+            adapter._binding_for_window.assert_not_called()
+
+    def test_malformed_window_metadata_fails_closed_at_window_selection(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        window = FakeWindow(700, 42)
+        window.frame = None
+        adapter._preflight_screen_recording = lambda: None
+        adapter._shareable_content = lambda: FakeContent([window])
+
+        with self.assertRaises(CaptureError) as raised:
+            adapter.discover(TARGET)
+        self.assertEqual(raised.exception.diagnostic.stage, "window_selection")
+        self.assertEqual(raised.exception.diagnostic.error_type, "type_error")
+
+    def test_window_selection_accepts_exact_minimum_dimensions(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        window = FakeWindow(700, 42, frame=FakeFrame(0, 0, 320, 240))
+
+        self.assertIs(adapter._single_window_for_pid(FakeContent([window]), 42), window)
+
+    def test_bound_window_candidate_changes_are_rejected(self) -> None:
+        changed_pid = FakeWindow(700, 42)
+        changed_pid.application = FakeWindowApplication(43)
+        changed_bundle = FakeWindow(700, 42)
+        changed_bundle.application = FakeWindowApplication(42, "wrong.bundle")
+        windows = (
+            FakeWindow(700, 42, frame=FakeFrame(0, 0, 319, 240)),
+            FakeWindow(700, 42, layer=1),
+            changed_pid,
+            changed_bundle,
+        )
+        for window in windows:
+            adapter = object.__new__(MacOSCapture)
+            adapter._preflight_screen_recording = lambda: None
+            adapter._shareable_content = lambda: FakeContent([window])
+            adapter._capture_window_image = Mock()
+            with self.subTest(window=window), self.assertRaises(CaptureError) as raised:
+                adapter.capture(MAC_BINDING)
+            self.assertEqual(raised.exception.diagnostic.code, "window_missing")
+            adapter._capture_window_image.assert_not_called()
 
     def test_filter_sets_exact_non_1080p_output_and_window_shadow_selector(self) -> None:
         adapter = object.__new__(MacOSCapture)

@@ -136,11 +136,13 @@ class MacOSCapture:
                                stage="preflight", error_type=capture_error_type(error)) from error
 
     def _single_window_for_pid(self, content: Any, pid: int) -> Any:
-        windows = [
-            window for window in content.windows()
-            if self._window_pid(window) == pid and self._verified_roblox_window(window) and self._on_screen(window)
-        ]
-        if len(windows) != 1:
+        windows = [window for window in content.windows() if self._qualified_window(window, pid)]
+        if not windows:
+            raise CaptureError(
+                f"macOS expected exactly one capturable window for PID {pid}; found 0.",
+                code="window_missing", stage="window_selection",
+            )
+        if len(windows) > 1:
             raise CaptureError(
                 f"macOS expected exactly one capturable window for PID {pid}; found {len(windows)}.",
                 code="window_count", stage="window_selection",
@@ -149,8 +151,7 @@ class MacOSCapture:
 
     def _window_by_id_and_pid(self, content: Any, window_id: str, pid: int) -> Any:
         for window in content.windows():
-            if (str(window.windowID()) == window_id and self._window_pid(window) == pid
-                    and self._verified_roblox_window(window) and self._on_screen(window)):
+            if str(window.windowID()) == window_id and self._qualified_window(window, pid):
                 return window
         raise CaptureError("macOS bound window was replaced or is no longer capturable.",
                            code="window_missing", stage="window_selection")
@@ -194,6 +195,17 @@ class MacOSCapture:
             raise CaptureError("macOS window visibility is unavailable; refusing capture.",
                                code="unavailable", stage="window_selection")
         return bool(state())
+
+    def _qualified_window(self, window: Any, pid: int) -> bool:
+        if (self._window_pid(window) != pid or not self._verified_roblox_window(window)
+                or not self._on_screen(window)):
+            return False
+        layer = float(window.windowLayer())
+        frame = window.frame()
+        x, y, width, height = (float(frame.origin.x), float(frame.origin.y),
+                               float(frame.size.width), float(frame.size.height))
+        return (isfinite(layer) and layer == 0 and all(isfinite(value) for value in (x, y, width, height))
+                and width >= 320 and height >= 240)
 
     def _binding_for_window(self, content: Any, window: Any, target: Target) -> WindowBinding:
         content_filter = self._at_stage("filter_geometry", self._content_filter, window)
