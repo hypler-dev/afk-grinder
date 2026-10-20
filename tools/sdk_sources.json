@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "sdk_version": "5.14.3",
+  "scope": "Developer source preparation only; SDK-bearing publication remains blocked.",
+  "components": [
+    {
+      "name": "MaaFramework",
+      "repository": "MaaXYZ/MaaFramework",
+      "commit": "8963191215ca49d6b037802acd07d20a4213160a",
+      "url": "https://codeload.github.com/MaaXYZ/MaaFramework/tar.gz/8963191215ca49d6b037802acd07d20a4213160a",
+      "size": 876842,
+      "sha256": "afa7aa4213210ac22037e54da877152b043adc4007c2f027345b5a93dd73890f",
+      "archive_root": "MaaFramework-8963191215ca49d6b037802acd07d20a4213160a",
+      "destination": "source/MaaFramework"
+    },
+    {
+      "name": "MaaUtils",
+      "repository": "MaaXYZ/MaaUtils",
+      "commit": "f8994a38ddc6858800dfea8a04e958a0adbfb184",
+      "url": "https://codeload.github.com/MaaXYZ/MaaUtils/tar.gz/f8994a38ddc6858800dfea8a04e958a0adbfb184",
+      "size": 65891,
+      "sha256": "025d61300c08205d2915781a609701c68edbab427cf1ffa355eaaa9e8a669e78",
+      "archive_root": "MaaUtils-f8994a38ddc6858800dfea8a04e958a0adbfb184",
+      "destination": "source/MaaFramework/source/MaaUtils"
+    },
+    {
+      "name": "MaaDeps",
+      "repository": "MaaXYZ/MaaDeps",
+      "commit": "d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7",
+      "url": "https://codeload.github.com/MaaXYZ/MaaDeps/tar.gz/d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7",
+      "size": 201435,
+      "sha256": "653ced767dcd32b4315f2976de5c7e15dcfeb9e8fae633300483a33409d492b1",
+      "archive_root": "MaaDeps-d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7",
+      "destination": "source/MaaFramework/source/MaaUtils/MaaDeps"
+    },
+    {
+      "name": "vcpkg",
+      "repository": "microsoft/vcpkg",
+      "commit": "c5a15727ee70fddf0296f0d8aafc3f58916fefac",
+      "url": "https://codeload.github.com/microsoft/vcpkg/tar.gz/c5a15727ee70fddf0296f0d8aafc3f58916fefac",
+      "size": 5375037,
+      "sha256": "8557017b8642a1bf944400141b950a56eb06e1351a6ca70f06368512adb87d58",
+      "archive_root": "vcpkg-c5a15727ee70fddf0296f0d8aafc3f58916fefac",
+      "destination": "source/MaaFramework/source/MaaUtils/MaaDeps/vcpkg"
+    }
+  ]
+}
