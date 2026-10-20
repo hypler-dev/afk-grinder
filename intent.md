@@ -34,6 +34,7 @@ The eventual application should allow users to record, edit, test, and update ac
 - Produce no application or installer claims without platform-specific validation.
 - Do not add Linux delivery or imply that desktop framework support proves mobile automation support.
 - Keep credentials, input recordings, screenshots, local profiles, and generated installers out of source control.
+- Roblox sign-in remains manual. The user explicitly removed login automation from scope on October 19, 2026; do not collect credentials, manage login sessions, or record/play back authentication screens.
 - Repository creation and its initial push are authorized. Signing, publishing binaries, app-store submission, and live gameplay execution are separate future work.
 
 ## Non-goals

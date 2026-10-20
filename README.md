@@ -61,6 +61,8 @@ Roblox prohibits cheating/exploits and disruptive automation. Permission for thi
 
 The proposed product uses normal OS input and screen capture. Code injection, client modification, memory access, anti-cheat bypass, credential collection, and automated purchases or trades are outside the proposed scope. Screen captures and input recordings should remain local by default; capture must be explicit and limited to the intended game session.
 
+Roblox sign-in remains manual. Login automation, credential storage, and session-token management are excluded. Recording and playback must stop before interacting with authentication screens.
+
 ## Project authority
 
 [intent.md](intent.md) is the canonical scope and acceptance record. Repository creation and desktop platform targets are authorized; detailed application design and mobile support remain proposed.
