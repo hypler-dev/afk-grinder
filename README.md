@@ -1,5 +1,7 @@
 # AFK Grinder
 
+**Helping kids touch grass by automating their games.**
+
 A local, supervised Windows/macOS input prototype for Roblox, starting with an editable Adopt Me input-check template.
 
 **Current state:** source prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. The bundled template tests movement controls; it does not complete Adopt Me tasks. Native game compatibility, Windows hardware behavior, and production installers are not yet validated.
@@ -8,7 +10,7 @@ A local, supervised Windows/macOS input prototype for Roblox, starting with an e
 
 ## Why this exists
 
-I started AFK Grinder as a fun project for my kids—with one goal: less repetitive game time, more time outside. The idea is to spend less of the day repeating the same in-game chores and more of it getting off the couch, playing outdoors, and being kids.
+I built this for my kids because I wanted them to go outside. This is a fun family project aimed at spending less time on repetitive game chores and more time outdoors.
 
 This is an experimental family project. The current prototype is for short, supervised input tests; unattended gameplay is not ready yet.
 
@@ -107,6 +109,22 @@ With uv, use `uv sync --locked --extra build` followed by `uv run --locked --ext
 - Windows: `dist/AFKGrinder/AFKGrinder.exe` and its adjacent runtime files; keep the whole directory together.
 
 Build output is ignored by Git. Windows installer creation and macOS distribution packaging, signing/notarization, clean-machine installation, upgrade/uninstall, and release publication remain future work. Do not treat an ad hoc signed or unsigned local build as a trusted production release.
+
+## Download automated test builds
+
+Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml), select a successful run, and scroll to **Artifacts**. You must be signed into a GitHub account with access to this private repository.
+
+| Download | Target | Contents |
+| --- | --- | --- |
+| `AFKGrinder-windows-x64-<commit>` | Windows x64 | Portable application ZIP; extract the entire directory and open `AFKGrinder.exe` |
+| `AFKGrinder-macos-arm64-<commit>` | Apple Silicon Mac | `.tar.gz` containing `AFKGrinder.app` |
+| `AFKGrinder-macos-x64-<commit>` | Intel Mac | `.tar.gz` containing `AFKGrinder.app` |
+
+GitHub wraps each artifact in a download ZIP. Extract it, then extract the application archive inside. Keep the Windows executable beside its runtime files. The Mac archive preserves app-bundle symlinks and executable permissions. Each artifact includes `SHA256SUMS.txt` and `BUILD_INFO.json` identifying the exact source revision and architecture. Artifacts expire after 14 days; use **Run workflow** to rebuild when needed.
+
+The workflow runs for app/build changes pushed to `main` and pull requests targeting `main`, plus manual dispatch. Each target runs safety/packaging tests, fake-input UI smoke, a native build, and packaged dry-run/readiness checks before uploading. macOS permission denial is expected on fresh runners; missing native modules or other startup errors fail the build. No Roblox session or game input runs in CI.
+
+These are unsigned prototype bundles, not production installers or gameplay certification. OS signing/trust warnings may appear. This project does not disable OS protections or change permissions automatically. Live testing still requires your own manual Roblox sign-in and explicit input permissions.
 
 ## Validation
 

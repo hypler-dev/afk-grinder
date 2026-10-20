@@ -16,6 +16,7 @@ Implement a bounded local input prototype with native Windows/macOS focus and Es
 - Native implementation worker: `src/afk_grinder/backends/` only.
 - UI implementation worker: `src/afk_grinder/ui.py` only, following the separate UI design handoff.
 - Read-only designer and reviewers: exact scoped source and documentation only.
+- Automated build follow-up: controller owns `.github/workflows/build.yml`, documentation, validation, GitHub Actions execution, and commit/push. A bounded native GPT implementation worker owns `tools/package_build.py`, `tools/check_build.py`, and `tests/test_package_build.py`. Fresh independent review covers the exact CI/helper/documentation delta before push.
 
 Final changed paths (all relative to the repository root):
 
@@ -43,6 +44,10 @@ tests/test_templates.py
 tools/build.py
 tools/launch.py
 tools/smoke_ui.py
+.github/workflows/build.yml
+tools/check_build.py
+tools/package_build.py
+tests/test_package_build.py
 ```
 
 ## Sequence
@@ -53,6 +58,7 @@ tools/smoke_ui.py
 4. Run safety unit tests, static compilation, artifact validators, and a dry-run/source startup check.
 5. Obtain fresh independent code and UI review; fix findings and rerun affected checks.
 6. Record exact evidence and remaining native hardware tests. Do not publish a release.
+7. Follow-up authorized October 19: commit/push the reviewed prototype, add Windows x64/macOS arm64/macOS x64 hosted builds, test/package/checksum archives, upload private artifacts, and verify actual workflow completion and download records. Signed/public releases remain closed.
 
 ## Validators
 
@@ -62,6 +68,7 @@ tools/smoke_ui.py
 - `git diff --check`
 - Source GUI and native readiness smoke on the current macOS host, without sending game input.
 - A local package build when dependencies are available; no signing or distribution claim.
+- Automated build follow-up: actionlint validates the workflow; helper tests verify archives/checksums/metadata; each hosted target runs unit tests, fake-input GUI smoke, a native build, and packaged startup checks before upload. Verify workflow status and actual artifact records through GitHub, then download and inspect the archives.
 
 ## Independent review
 
@@ -92,3 +99,14 @@ None at plan creation. Python/Tk is the bounded proof-of-input prototype; Tauri 
 - Remaining gates: real Windows validation/build; real Roblox input acceptance, focus loss, Escape, Stop, and quit on each platform; clean-machine packaged permissions and install/uninstall; CPU architecture coverage; accessibility with assistive technology; installer creation, signing/notarization, and separately authorized publication.
 - Original prototype handoff: no live game input, login, account access, screenshot capture by the application, deployment, or release publication occurred. At that snapshot no prototype commit or push had been requested or performed. The subsequent October 19 instruction authorizes commit/push and private CI test artifacts. Repository remains private `hypler-dev/afk-grinder`; bootstrap HEAD was `25ff352`.
 - Original prototype working-tree snapshot: 3 modified tracked files and 20 new source/documentation files, all owned by this slice. No unrelated dirt observed. `.venv/`, `build/`, and the 29 MB local `dist/AFKGrinder.app` are ignored generated state. The local executable is macOS arm64; its SHA-256 is `ead700c6323e98018648ff4a66375a53449c45813b0480916bdce95106e65fa5`.
+
+### Automated build follow-up
+
+- Prototype committed and pushed as `38b07e9` (`feat: add supervised desktop input prototype`). The private repository's main branch was verified before push; the 32-test safety suite, whitespace checks, and intent/plan validators passed.
+- User selected direct wording: "Helping kids touch grass by automating their games." README explains that this began as a fun project for Jeff's kids because he wanted them to go outside.
+- Workflow targets Windows x64 (`windows-2025`), macOS arm64 (`macos-15`), and macOS x64 (`macos-15-intel`). Current standard/private runner labels were verified in official GitHub documentation.
+- Official GitHub actions are pinned to verified commit SHAs: checkout v7.0.1, setup-python v7.0.0, upload-artifact v7.0.2. Read-only repository permission and disabled persisted checkout credentials are explicit. No signing secrets or public releases are introduced.
+- Workflow YAML parsing and actionlint v1.7.12: PASS. The validator was downloaded from its official GitHub release and checked against its published SHA-256 file.
+- Native GPT `gpt_worker` (OpenAI Terra) implemented `tools/package_build.py`, `tools/check_build.py`, and `tests/test_package_build.py`. Controller added no-input packaged `--ui-smoke` startup and integrated the workflow. GLM was unused; no GLM contact or fallback occurred.
+- Local pre-push validation: 38 unit tests PASS; compile, tracked/new-file whitespace, artifact validators, and actionlint PASS. Rebuilt Mac arm64 package PASS; packaged dry run, no-input GUI startup, and native readiness all returned 0 outside the sandbox. No native input or permissions changes occurred. Archive metadata, SHA-256 sums, and executable mode checks PASS.
+- Fresh independent CI/helper/CLI/documentation review by native GPT `gpt_reviewer` (OpenAI Terra): PASS, no actionable P1/P2/P3 findings. Workflow push/run and downloadable artifact verification are next. Private CI artifacts are authorized for testing; this does not authorize a public/signed release or live gameplay.

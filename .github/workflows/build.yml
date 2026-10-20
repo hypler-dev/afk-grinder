@@ -1,0 +1,102 @@
+name: Build desktop prototypes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "tools/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "tools/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x64
+            runner: windows-2025
+            python-arch: x64
+          - label: macos-arm64
+            runner: macos-15
+            python-arch: arm64
+          - label: macos-x64
+            runner: macos-15-intel
+            python-arch: x64
+    defaults:
+      run:
+        shell: bash
+    env:
+      UV_PYTHON_DOWNLOADS: never
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          architecture: ${{ matrix.python-arch }}
+
+      - name: Install locked build dependencies
+        run: |
+          python -m pip install uv==0.12.9
+          uv sync --locked --extra build --python 3.12
+
+      - name: Run safety and packaging tests
+        run: uv run --locked --extra build python -m unittest discover -s tests -v
+
+      - name: Compile source
+        run: uv run --locked --extra build python -m compileall -q src tests tools
+
+      - name: Smoke-test UI with fake input only
+        run: >-
+          uv run --locked --extra build python -c
+          'import faulthandler, runpy; faulthandler.dump_traceback_later(60, exit=True);
+          runpy.run_path("tools/smoke_ui.py", run_name="__main__")'
+
+      - name: Build native application
+        run: uv run --locked --extra build python tools/build.py
+
+      - name: Smoke-test packaged application without game input
+        run: uv run --locked --extra build python tools/check_build.py
+
+      - name: Package test download with source metadata and checksum
+        run: >-
+          uv run --locked --extra build python tools/package_build.py
+          --label '${{ matrix.label }}' --commit "$GITHUB_SHA"
+
+      - name: Upload private test artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: AFKGrinder-${{ matrix.label }}-${{ github.sha }}
+          path: artifact-output/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

@@ -19,6 +19,7 @@ node_modules/
 target/
 dist/
 build/
+artifact-output/
 __pycache__/
 *.py[cod]
 .venv/
