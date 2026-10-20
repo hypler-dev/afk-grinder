@@ -2,7 +2,7 @@
 
 import unittest
 
-from afk_grinder.desktop_app import DesktopAPI, allowed_document, restricted_dispatch
+from afk_grinder.desktop_app import DesktopAPI, _document_failure, allowed_document, restricted_dispatch
 
 
 class FakeController:
@@ -21,6 +21,14 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_entry_failure_diagnostics_expose_no_native_url(self):
+        expected = "file:///trusted/web/index.html"
+        self.assertEqual(_document_failure(None, expected), "blank_document")
+        self.assertEqual(_document_failure("about:blank", expected), "blank_document")
+        self.assertEqual(_document_failure(expected.upper(), expected), "url_case_mismatch")
+        self.assertEqual(_document_failure(object(), expected), "unexpected_url_type")
+        self.assertEqual(_document_failure("file:///private/person/secret", expected), "different_document")
+
     def test_dispatch_rejects_private_dotted_and_unregistered_native_methods(self):
         calls = []
         dispatch = restricted_dispatch(lambda *args: calls.append(args))

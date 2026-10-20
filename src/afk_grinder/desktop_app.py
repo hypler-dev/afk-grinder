@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from .build_info import build_info
+from .capture import capture_error_type
 from .desktop_controller import DesktopController
 
 _mac_delegate_class: Any = None
@@ -18,6 +19,17 @@ _PUBLIC_BRIDGE_METHODS = frozenset({"get_state", "get_preview", "command"})
 def allowed_document(url: Any, expected: str) -> bool:
     """Accept only the exact bundled entry point, without query or fragment."""
     return isinstance(url, str) and url == expected
+
+
+def _document_failure(url: Any, expected: str) -> str:
+    """Classify a rejected entry point without logging native file locations."""
+    if url is None or url == "about:blank":
+        return "blank_document"
+    if not isinstance(url, str):
+        return "unexpected_url_type"
+    if url.casefold() == expected.casefold():
+        return "url_case_mismatch"
+    return "different_document"
 
 
 def restricted_dispatch(original: Any) -> Any:
@@ -149,6 +161,13 @@ def open_desktop(*, smoke: bool = False) -> None:
     closed = threading.Event()
     close_worker_started = threading.Event()
 
+    def fail(stage: str, error: Exception | None = None) -> None:
+        first = not failed.is_set()
+        failed.set()
+        if first and smoke and sys.stderr is not None:
+            kind = capture_error_type(error) if error is not None else "none"
+            print(f"Launcher smoke failure: {stage} ({kind}).", file=sys.stderr, flush=True)
+
     def reject_navigation() -> None:
         api._allowed.clear()
         controller.command("stop", {})
@@ -157,8 +176,8 @@ def open_desktop(*, smoke: bool = False) -> None:
     def before_show() -> None:
         try:
             guard.append(_install_navigation_guard(window, url, reject_navigation))
-        except Exception:
-            failed.set()
+        except Exception as error:
+            fail("navigation_guard", error)
             controller.close()
             # Public destroy waits for the shown event, which has not fired
             # during before_show. Close on a worker once startup can proceed.
@@ -169,13 +188,14 @@ def open_desktop(*, smoke: bool = False) -> None:
 
     def loaded() -> None:
         try:
-            if guard and allowed_document(window.get_current_url(), url) and not failed.is_set():
+            current_url = window.get_current_url()
+            if guard and allowed_document(current_url, url) and not failed.is_set():
                 api._allowed.set()
             else:
-                failed.set()
+                fail(_document_failure(current_url, url) if guard else "missing_guard")
                 window.destroy()
-        except Exception:
-            failed.set()
+        except Exception as error:
+            fail("loaded_callback", error)
             window.destroy()
 
     def finish_close() -> None:
@@ -205,6 +225,7 @@ def open_desktop(*, smoke: bool = False) -> None:
         job = BackgroundJob("sdk")
         deadline = time.monotonic() + 18
         result = None
+        stage = "bridge_startup"
         try:
             while time.monotonic() < deadline and not closed.is_set() and not failed.is_set():
                 result = job.poll() if result is None else result
@@ -215,15 +236,19 @@ def open_desktop(*, smoke: bool = False) -> None:
             else:
                 raise RuntimeError("Launcher bridge startup timed out.")
             missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
+            stage = "sdk_service"
             if not missing_sdk and (result.error or result.report is None):
                 raise RuntimeError("Spawned recognition service failed.")
+            stage = "ui_state"
             if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
                 raise RuntimeError("Inactive cleanup warning is visible.")
+            stage = "blocked_navigation"
+            rejected.clear()
             window.run_js("window.location.href = 'about:blank';")
             if not rejected.wait(2) or not allowed_document(window.get_current_url(), url):
                 raise RuntimeError("Native navigation guard failed.")
-        except Exception:
-            failed.set()
+        except Exception as error:
+            fail(stage, error)
         finally:
             job.cancel()
             controller.close()

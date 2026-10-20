@@ -446,9 +446,7 @@ class DesktopController:
             if target is None:
                 raise RuntimeError("Select a verified Roblox target first.")
             self._acknowledged = False
-            self._clear_geometry_locked()
-            self._preview_frame = None
-            self._preview_png = None
+            self._clear_preview_locked()
             self._begin_job_locked("capture", target)
 
     def _start_sdk_check(self) -> None:
@@ -528,6 +526,7 @@ class DesktopController:
     def _check_area(self, payload: dict[str, Any]) -> None:
         self._require_payload(payload, {"preview_id"})
         with self._lock:
+            self._require_reference_mutation_locked()
             if (not _is_int(payload["preview_id"]) or payload["preview_id"] != self._preview_id
                     or self._area is None or self._area_layout is None):
                 raise RuntimeError("A current area is required.")
@@ -537,8 +536,11 @@ class DesktopController:
             if target is None:
                 raise RuntimeError("Select a verified Roblox target first.")
             area, layout = self._area, self._area_layout
+            self._preview_id += 1
             self._preview_frame = None
+            self._preview_layout = None
             self._preview_png = None
+            self._preview_width = self._preview_height = 0
             self._tracker.invalidate()
             self._begin_job_locked("capture", target, area, layout)
 
@@ -551,8 +553,9 @@ class DesktopController:
                 return
             self._scan_generation += 1
             self._scan_started_at = self._clock()
-            self._binding_phase = "searching"
-            self._binding_message = "Looking for Roblox."
+            if self._binding_phase in {"error", "searching", "unsupported"}:
+                self._binding_phase = "searching"
+                self._binding_message = "Looking for Roblox."
             generation = self._scan_generation
             thread = threading.Thread(target=self._scan_worker, args=(generation,), daemon=True,
                                       name="target-discovery")
@@ -609,6 +612,11 @@ class DesktopController:
                 if result is not None:
                     cancel_job = self._complete_job_locked(result)
             self._drain_png_locked()
+            if self._preview_frame is not None and self._preview_phase == "available":
+                now = self._clock()
+                if now < self._preview_frame.captured_at or now - self._preview_frame.captured_at > 0.5:
+                    self._tracker.invalidate()
+                    self._preview_phase = "historical"
             rescan = (
                 not self._closing
                 and self._backend is not None
@@ -726,13 +734,20 @@ class DesktopController:
             if layout.target != context.target:
                 raise ValueError("Target changed.")
             now = self._clock()
-            self._tracker.accept(layout, result.frame.pixels, result.frame.captured_at, now)
+            if not math.isfinite(now) or result.frame.captured_at > now:
+                raise ValueError("Observation timestamp is invalid.")
+            fresh = now - result.frame.captured_at <= 0.5
             if context.area is not None:
                 if layout != context.source_layout:
                     raise ValueError("Layout changed.")
+                self._tracker.accept(layout, result.frame.pixels, result.frame.captured_at, now)
                 self._tracker.calibrate((1280, 720), context.area, now=now)
+            elif fresh:
+                self._tracker.accept(layout, result.frame.pixels, result.frame.captured_at, now)
+            else:
+                self._tracker.invalidate()
             self._preview_id += 1
-            self._preview_phase = "available"
+            self._preview_phase = "available" if fresh else "historical"
             self._preview_width, self._preview_height = result.frame.physical_size
             self._preview_region_kind = result.frame.region_kind
             self._preview_verified = result.frame.content_verified

@@ -102,6 +102,79 @@ def frame(target=TARGET_ONE, *, captured_at=10.0, native_rect=(0, 0, 16, 9)) -> 
 
 
 class DesktopControllerTests(unittest.TestCase):
+    def test_background_refresh_keeps_ambiguous_choices_visible(self) -> None:
+        controller = self.make_controller((TARGET_ONE, TARGET_TWO))
+        before = controller.get_state()["binding"]
+        entered, release = threading.Event(), threading.Event()
+        original = self.backend.discover_targets
+        def delayed():
+            entered.set()
+            release.wait(1)
+            return original()
+        self.backend.discover_targets = delayed
+        try:
+            state = controller.command("refresh_targets", {})["state"]
+            self.assertTrue(entered.wait(1))
+            self.assertEqual(state["binding"], before)
+        finally:
+            release.set()
+            controller._scan_thread.join(1)
+
+    def capture_reference(self, controller, captured_at=10.0):
+        controller.command("capture", {})
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame(captured_at=captured_at))
+        state = controller.get_state()
+        preview_id = state["preview"]["id"]
+        self.assertTrue(controller.command("set_area", {
+            "preview_id": preview_id, "rect": {"x": 0, "y": 0, "width": 16, "height": 9},
+        })["ok"])
+        return preview_id
+
+    def test_slow_capture_is_editable_history_without_current_geometry(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        preview_id = self.capture_reference(controller, captured_at=9.0)
+        state = controller.get_state()
+        self.assertEqual(state["preview"]["phase"], "historical")
+        self.assertIsNone(state["preview"]["error"])
+        self.assertEqual(state["preview"]["id"], preview_id)
+        self.assertIsNotNone(state["preview"]["area"])
+        self.assertIsNotNone(controller._preview_frame)
+        self.assertIsNone(controller._tracker.latest)
+        self.assertIsNone(controller._tracker.calibration)
+
+    def test_expired_match_keeps_editable_image_but_invalidates_observation(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        preview_id = self.capture_reference(controller)
+        controller.command("check_area", {"preview_id": preview_id})
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.assertEqual(controller.get_state()["preview"]["geometry"], "matched")
+        self.clock.value = 10.6
+        state = controller.get_state()
+        self.assertEqual(state["preview"]["phase"], "historical")
+        self.assertEqual(state["preview"]["geometry"], "historical")
+        self.assertIsNotNone(controller._preview_frame)
+        self.assertIsNone(controller._tracker.latest)
+        self.assertIsNone(controller._tracker.calibration)
+        self.assertTrue(controller.command("set_area", {
+            "preview_id": state["preview"]["id"], "rect": state["preview"]["area"],
+        })["ok"])
+
+    def test_stale_reference_check_and_future_frame_fail_closed(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        preview_id = self.capture_reference(controller)
+        self.clock.value = 10.6
+        controller.command("check_area", {"preview_id": preview_id})
+        self.assertIsNone(controller._preview_frame)
+        self.assertIsNone(controller._preview_layout)
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        state = controller.get_state()
+        self.assertEqual(state["preview"]["phase"], "error")
+        self.assertIsNone(state["preview"]["area"])
+        controller.command("capture", {})
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame(captured_at=11.0))
+        self.assertEqual(controller.get_state()["preview"]["phase"], "error")
+        self.assertIsNone(controller._tracker.latest)
+
     def test_native_scan_failure_stops_live_but_does_not_cancel_dry_run(self) -> None:
         for mode in ("dry", "live"):
             with self.subTest(mode=mode):
@@ -304,5 +377,7 @@ class DesktopControllerTests(unittest.TestCase):
         controller.command("set_ack", {"acknowledged": True})
         self.runner.events.put(Status("completed", "ignored raw event"))
         self.assertFalse(controller.get_state()["session"]["acknowledged"])
+        controller.close()
+        self.assertTrue(controller._close_stop_done.wait(1))
         self.assertTrue(controller.close())
         self.assertFalse(controller.command("set_mode", {"mode": "dry"})["ok"])
