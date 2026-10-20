@@ -1,14 +1,14 @@
 <!-- intent-driven-delivery:spec:v1 -->
-# Specification: Desktop input safety prototype
+# Specification: AFK Grinder desktop application
 
 Status: accepted
 Intent: [intent.md](intent.md)
 Owner: Jeff / hypler-dev
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Behavior
 
-The application is a local Python/Tk desktop prototype for Windows and macOS. No runtime LLM, network service, screenshot capture, recording, login automation, or credential storage is used.
+The application is a local Python/Tk desktop application for Windows and macOS. Its default runtime remains the supervised input prototype. The adopted [BUILD.md](BUILD.md) defines further milestones; implementation status and evidence live in [plan.md](plan.md). No runtime LLM, cloud inference, login automation, or credential storage is used.
 
 The default mode is dry run. A user can edit a version-1 JSON template containing `hold_key`, `click`, and `wait` actions. Keys are restricted to movement/interact controls; clicks use the current pointer position. Individual holds and waits are at most five seconds, a template has at most 100 steps, and total execution including a three-second start countdown is at most 30 seconds. No repeat loop is supported.
 
@@ -40,7 +40,21 @@ Focus checks and global input injection cannot be atomic; a small check-to-send 
 
 ## Data, privacy, and permissions
 
-Do not request or collect login credentials, session tokens, arbitrary keystrokes, window titles, or screenshots. macOS live execution requires permission to post events and observe the Escape key state. Permission checks must not silently request access. Status messages contain operation/result information only.
+Do not request or collect login credentials, session tokens, arbitrary keystrokes, or unrelated window titles. The input prototype does not capture screenshots. The blueprint permits window-only in-memory capture for local recognition after its capture/calibration gates; persistent diagnostic images require explicit consent. macOS live execution requires permission to post events and observe the Escape key state. Permission checks must not silently request access. Status messages contain operation/result information only.
+
+## Optional recognition SDK foundation
+
+The `recognition` extra pins MaaFw 5.14.3 and its resolved transitive dependencies in uv.lock. Importing the application or recognition boundary does not import the SDK. `--sdk-check` launches a disposable child process with a 15-second whole-process deadline, including native loading and destruction. Status travels through a private temporary JSON file, because frozen Windows windowed apps have no standard output. The file contains no pixels and is removed after the check.
+
+The probe rejects `MAAFW_BINARY_PATH`, requires matching installed/native versions, disables persistent SDK logs, saved draws, saved error images and debug mode, caps the recognition cache at two frames, selects a CPU resource, and binds a custom controller containing a synthetic 2×2 frame. Every input, shell, start-app and stop-app callback rejects requests. It checks SDK cancellation with bounded status polling and never uses `Job.wait()`. A polling deadline alone cannot bound a stuck native call; the outer process deadline provides that boundary. This is SDK initialization evidence, not game recognition or care-task proof.
+
+SDK-bearing bundles can be built locally with `tools/build.py --with-recognition` for diagnosis. CI builds and checks these without uploading them, then rebuilds the downloadable input prototype with MaaFw/MaaAgentBinary/NumPy/StrEnum excluded. Packaging rejects an SDK-bearing bundle until the corresponding-source and notice distribution gate is closed. Project and upstream license notices accompany source and test artifacts.
+
+## Observation and coordinate foundation
+
+Observation metadata separates physical BGR capture dimensions, reference coordinates and native input coordinates. It includes the pinned Roblox process/window, native content bounds, monitor, measured scale, monotonic capture timestamp, generation and sequence. Geometry validation rejects oversized or inconsistent buffers and unsupported aspect ratios rather than stretching the scene. Reference-to-pixel and pixel-to-native conversions use the measured content rectangle, including negative monitor origins and fractional/Retina scale.
+
+The tracker clears calibration after capture failure, stale/future/out-of-order frames, target/window replacement, or any bounds, monitor, size or scale change. Old callbacks and observations cannot remain current after a newer frame. Calibration requires a fresh frame. This pure geometry layer sends no input and does not establish anchors, gameplay readiness or care-task completion. Native capture and calibration UI acceptance remain separate gates.
 
 ## Compatibility and migration
 
@@ -56,4 +70,4 @@ CI builds use hosted target-OS runners, pinned action revisions, and locked Pyth
 
 ## Non-goals and open questions
 
-See [intent.md](intent.md). Mobile, recording, full Adopt Me automation, login, purchases, trading, anti-cheat workarounds, automatic recovery, and release publication are excluded.
+See [intent.md](intent.md). Mobile, login, purchases, trading, injection and anti-cheat workarounds remain excluded. Verified indoor care routines and bounded recovery are future BUILD.md milestones; they are not enabled by the SDK diagnostic or geometry layer. Signed production release publication and longer-session enablement require their separate gates.

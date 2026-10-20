@@ -1,13 +1,13 @@
 <!-- intent-driven-delivery:intent:v1 -->
-# Intent: AFK Grinder desktop prototype
+# Intent: AFK Grinder desktop application
 
 Status: accepted
 Authority: this file
 Owner: Jeff / hypler-dev
-Accepted by: Jeff, through the October 19, 2026 chat instructions to build/push the prototype and automated builds, then make the repository public, add topics and README artwork, and perform supervised Mac Adopt Me input/focus/emergency-stop testing after manual login
-Last updated: 2026-10-19
+Accepted by: Jeff, through the October 19 prototype/publication instructions and the October 20, 2026 instruction to develop the free, open-source application using the supplied BUILD.md blueprint and choose an appropriate license with warranty/liability disclaimers
+Last updated: 2026-10-20
 
-Acceptance covers the bounded desktop prototype, automated test-binary builds, public repository visibility with appropriate topics and README artwork, and short supervised Mac Adopt Me tests after the user logs in manually. Signed releases, production installers, mobile delivery, and unattended gameplay claims remain outside this slice.
+Acceptance covers development against the owner-supplied [BUILD.md](BUILD.md), preserved verbatim from `/Users/jeff/Downloads/BUILD.md`. This intent remains the canonical authority; BUILD.md defines the accepted product roadmap and acceptance gates, spec.md describes implemented runtime behavior, and plan.md records current evidence. The application is free and open source under MIT; third-party components retain their own licenses. Standard warranty and liability disclaimers do not promise immunity from every legal claim. Longer sessions and care routines require their blueprint milestones and live evidence before enablement. Production signing/release, mobile automation, transactions, and login automation remain excluded unless separately authorized.
 
 ## Problem and evidence
 
@@ -19,7 +19,7 @@ Build a local Windows/macOS prototype that executes bounded keyboard and mouse a
 
 Commit and push the reviewed prototype, then automate downloadable test builds for Windows x64 and macOS Apple Silicon/Intel. Record the source revision, target architecture, and checksums with each artifact. The project began as a fun family project for Jeff's kids, with the aim of spending less time on repetitive game chores and more time outdoors.
 
-The eventual application should allow users to record, edit, test, and update action templates without rebuilding the application. Recording, visual recognition, and specific Adopt Me gameplay routines remain future work. The Python/Tk prototype establishes the deterministic safety and input seam before a final production framework is selected.
+Extend the existing Python/Tk application incrementally with pinned local MaaFramework recognition, window-only in-memory capture/calibration, a restricted declarative resource-pack format, guarded session coordination, verified indoor Adopt Me care routines, curated signed pack updates, and evidence-gated endurance sessions. No runtime LLM, cloud inference, account system, subscription, or paid feature is needed. Preserve the existing 30-second live-run limit until the longer-session milestone has supporting soak evidence. Recording and visual action editing are not prerequisites; do not rewrite the UI during engine integration.
 
 ## Users and systems
 
@@ -32,7 +32,7 @@ The eventual application should allow users to record, edit, test, and update ac
 ## Constraints
 
 - The current authorized slice includes prototype commit/push, GitHub Actions execution, and test-binary artifact uploads in addition to implementation, documentation, and validation.
-- The latest user instruction explicitly authorizes public repository visibility, appropriate GitHub topics, an original README image, and supervised Mac gameplay input/focus/emergency-stop tests. This supersedes the earlier private-only and no-live-game-test boundaries for this bounded slice.
+- The October 20 instruction additionally authorizes implementation of BUILD.md, a free open-source application, and license/disclaimer selection. The earlier publication and short supervised test authorizations persist. New recognition/capture features must preserve safety and privacy gates rather than silently expanding live execution.
 - Produce no application or installer claims without platform-specific validation.
 - Do not add Linux delivery or imply that desktop framework support proves mobile automation support.
 - Keep credentials, input recordings, screenshots, local profiles, and generated installers out of source control.
@@ -43,10 +43,10 @@ The eventual application should allow users to record, edit, test, and update ac
 
 ## Non-goals
 
-- Unattended live grinding or claiming Adopt Me task completion. Short supervised control tests are authorized separately as described above.
+- Enabling unattended gameplay or claiming care-task completion before the relevant BUILD.md milestone has native and game-specific acceptance evidence. The long-term unattended goal remains on the roadmap; the current runtime stays bounded and supervised.
 - Publishing production installers, signed binaries, public releases, or app-store submissions.
 - Committing to mobile delivery or a final production framework.
-- Login, screen recording, action recording, visual recognition, account switching, or LLM orchestration.
+- Login, account switching, arbitrary text/chat entry, action recording, persistent screen recording by default, or LLM orchestration. Local window capture and recognition are authorized development work under BUILD.md; diagnostic recording requires explicit consent.
 - Client injection, memory access, anti-cheat bypass, credential collection, automated purchases, or automated trades.
 
 ## Assumptions and verified facts
@@ -84,6 +84,8 @@ The eventual application should allow users to record, edit, test, and update ac
 ## Source-of-truth links
 
 - Canonical authority: this `intent.md`.
+- Accepted implementation blueprint: [BUILD.md](BUILD.md), supplied and adopted October 20, 2026.
+- Project license: [LICENSE](LICENSE); dependency notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Product overview and proposed roadmap: [README.md](README.md).
 - Prototype behavior: [spec.md](spec.md); execution and evidence: [plan.md](plan.md).
 - Accepted scope source: the October 19, 2026 user instruction in this chat.

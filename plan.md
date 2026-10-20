@@ -1,14 +1,14 @@
 <!-- intent-driven-delivery:plan:v1 -->
-# Plan: Desktop input safety prototype
+# Plan: AFK Grinder desktop application
 
 Status: accepted
 Authority: [intent.md](intent.md)
 Owner: Jeff / hypler-dev
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 ## Scope and protected lanes
 
-Implement a bounded local input prototype with native Windows/macOS focus and Escape checks, then commit/push it and run automated test-binary builds as explicitly requested. The latest user instruction additionally authorizes public repository visibility/topics, an original README banner, and short supervised Mac Adopt Me control tests after manual login. No credential access, network runtime, unattended grinding, signed/public GitHub release publication, or mobile implementation.
+Preserve the bounded local input prototype and develop the adopted BUILD.md roadmap incrementally. Public repository visibility/topics, the original README banner, commit/push and automated test artifacts remain authorized. Native gameplay tests remain short and supervised after manual login. Credential access, transactions, injection, signed/public GitHub release publication and mobile implementation are excluded. Longer sessions require the blueprint's endurance evidence; network pack updates require its curated signature/provenance gates.
 
 ## Files and ownership
 
@@ -179,3 +179,45 @@ f413cb849148a3ddf1fbf9b30a61ec9b74abbed53ca1fb0c5f56fc89907d96f3  AFKGrinder-mac
 - Final receipt/procedure review found one P2: Finder launch alone does not prove the tested app is the verified artifact when bundle identifiers collide. The Mac procedure now requires exactly one running executable, exact artifact-path comparison, and source metadata matched to the selected successful run before live input. Fresh independent follow-up review by native GPT `gpt_reviewer` (OpenAI Terra): PASS, no remaining P1/P2/P3 findings.
 
 - Latest supervised-test snapshot: the exact corrected CI app is running, Roblox is bound, and no completed live run appears in the UI log. The owner has been asked to refresh readiness and run the default short movement sequence. Movement, live focus-loss cancellation, physical Escape cancellation, and live held-key cleanup are still PENDING; read-only native focus transitions and binding have been verified separately. No unrelated working-tree changes, signing credentials, login automation, purchases, trades, deployment, or public binary release were involved.
+
+
+## BUILD.md application development — October 20, 2026
+
+Authority: accepted intent.md and the owner-supplied BUILD.md. The owner explicitly requested updating the application from this document, free/open-source with an appropriate license and liability disclaimer. The earlier prototype evidence above remains historical; it does not prove the new roadmap complete.
+
+### Outcome and milestones
+
+| Milestone | Required outcome | Current acceptance |
+| --- | --- | --- |
+| 0 | Preserve baseline; pin/load/package MaaFw; dependency/license inventory | In progress |
+| 1 | Window-only capture/calibration and tested coordinate/layout invalidation; no input | Pending |
+| 2 | Restricted packs, local recognition, held-out labeled fixture/state evaluation | Pending |
+| 3 | One verified indoor care task with guarded action/outcome/cancellation evidence | Pending |
+| 4 | Additional independently verified indoor tasks and bounded recovery | Pending |
+| 5 | Curated signed pack update provenance, validation, rollback | Pending |
+| 6 | Opt-in longer sessions after native soak/performance evidence | Pending |
+| Later | Verified location navigation, other games, optional companion | Deferred by blueprint |
+
+The full goal remains active until the accepted roadmap is implemented and proved at its stated scope. Native Roblox movement/Escape/held-key proof from the earlier supervised attempt remains pending; never infer it from CI or read-only focus probes. No new live game input is authorized by a timer or recognition result alone. No purchases, trades, credentials, injection, shell routines, or arbitrary plugins.
+
+### Current execution and ownership
+
+- Controller GPT/Sol (OpenAI) owns architecture, licensing/privacy judgment, intent/spec/plan, project/dependency metadata, build integration, validation, commits and GitHub state.
+- Read-only native GPT `gpt_reader` (OpenAI Luna) extracts exact blueprint requirements and dependency metadata from secret-free named snapshots.
+- Bounded SDK worker ownership: recognition adapter package and its tests only. Native GPT `gpt_worker` returned `Selected model is at capacity. Please try a different model.` on initial contact and one bounded retry; controller takes implementation. No GLM/Spark fallback or external secret transfer.
+- Current files: BUILD.md, LICENSE, THIRD_PARTY_NOTICES.md, legal/dependency notices, pyproject.toml/uv.lock, lazy recognition adapter/tests, CLI/build/package helpers and exact tests/workflow, plus intent/spec/plan/README. Capture, coordinates, pack and session paths will be declared before their implementation milestones.
+- Initial SDK: official MaaFw 5.14.3, upstream tag v5.14.3 at `8963191215ca49d6b037802acd07d20a4213160a`, official Windows x64 and both macOS 13+ architecture wheels observed. This is package availability evidence, not supported minimum OS/hardware proof. Native package contents and license obligations are being audited before distribution.
+- License decision: unchanged standard MIT text for AFK Grinder's original code/documentation. It allows commercial redistribution as well as free use. MaaFramework remains LGPL-3.0; third-party assets and libraries are not relicensed. No claim that any disclaimer overrides mandatory law.
+- Validation: preserve all 43 baseline safety/package tests and eight fake-input GUI checks; add meaningful SDK lifecycle/privacy/cancellation/version tests; verify source/wheel/frozen legal contents, pinned SDK native smoke, CI on Windows x64/Mac arm64/x64, and fresh independent review. No source-only test may close native game or calibration/recognition gates.
+
+### SDK and coordinate foundation evidence
+
+- The owner-supplied BUILD.md is preserved byte-for-byte. Original project code/documentation now use standard MIT; README explains the disclaimer's limits. A wheel/source build succeeds; wheel metadata reports `License-Expression: MIT` and retains 99 legal files. Ninety-five upstream notice-file hashes match `licenses/provenance.json`, including 89 MaaDeps archive notices. These notices are an inventory, not proof of SDK-bearing distribution readiness.
+- MaaFw 5.14.3 source and frozen SDK diagnostics pass on the current Apple Silicon host: installed/native version match, CPU resource accepted, two-frame cache, persistent log/image/debug options disabled, synthetic 2×2 custom controller bound, input/shell/app callbacks disabled, cancellation passed. Whole native lifecycle runs in a disposable child with a 15-second deadline. No screen capture or OS input occurred.
+- The first stdout-based diagnostic design was replaced with private temporary status-file IPC for Windows windowed executables. Tests cover absent standard streams, malformed/oversized status, missing optional modules despite retained distribution metadata, version mismatch, rejected privacy settings and native-job timeout. No pixels are stored in status files.
+- Downloadable builds still exclude recognition implementation/native libraries. CI is configured to build/check the SDK privately, then rebuild the original input prototype before packaging. The artifact gate checks frozen CArchive/PYZ indexes, adjacent ZIP contents and filesystem/native-library paths. Harmless version/license metadata may remain. Actual SDK-free Mac archive packaging passes with its frozen module inventory checked. SDK corresponding-source/replacement and all-platform notice gates remain open.
+- The coordinate layer separates reference, physical capture and native input units; tests cover Retina/fractional scale, negative origins, aspect mismatch, invalid buffers, stale/future/out-of-order frames, late callbacks, and target/window/bounds/monitor/scale invalidation. Calibration is cleared after a failed frame. This has no input path and is not gameplay/anchor calibration acceptance.
+- Current full source suite: 78 tests pass, including eight separately implemented native-capture fake tests still awaiting independent review. Existing eight fake-input GUI tests pass. Compilation, actionlint, project artifact validation and whitespace checks pass for the foundation files; unchanged upstream notice whitespace is preserved. Mac SDK diagnostic and SDK-free packaged dry run/UI/native readiness pass. New all-target CI is pending push.
+- SDK boundary fresh independent read-only review by native GPT/Sol (OpenAI): PASS. Terra implementation returned capacity errors twice and Terra review once; a separate native GPT/Sol reviewer handles integration. No GLM contact, Spark fallback, account data or screenshots were transferred. A review finding expanded the publication guard from filesystem-only checks to embedded Python module indexes.
+- Related work in progress: separate native GPT/Sol fallback worker owns `src/afk_grinder/capture/{__init__,macos,windows}.py` and `tests/test_capture_backends.py`; fresh read-only capture review is pending. Mac raw-window previews are explicitly unverified content bounds; Windows uses client-only PrintWindow. Neither has native hardware/capture acceptance yet. No capture UI, task packs, care actions, signed updates or longer sessions are enabled by this foundation.
+- Foundation integration review: fresh native GPT/Sol read-only reviewer reports PASS, no P1/P2/P3 after the embedded-module guard fix; independently inspected the real Mac bundle's 230-module frozen index with no Maa implementation. The separate capture review identified explicit SCK output sizing and per-pixel conversion memory issues; those uncommitted capture files remain with their worker for repair and follow-up review, outside the foundation commit.

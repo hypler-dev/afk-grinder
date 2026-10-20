@@ -1,0 +1,480 @@
+{
+  "notice_inventory_only": true,
+  "files": [
+    {
+      "file": "MaaFramework-LGPL-3.0.md",
+      "sha256": "446e755fae55ff034bbb21be44670b5f116c2b2667947e7036f2bfe6632539a8",
+      "source": "https://github.com/MaaXYZ/MaaFramework/blob/8963191215ca49d6b037802acd07d20a4213160a/LICENSE.md"
+    },
+    {
+      "file": "GPL-3.0.txt",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "source": "https://www.gnu.org/licenses/gpl-3.0.txt"
+    },
+    {
+      "file": "PyObjC-12.2.2.txt",
+      "sha256": "0ca04b07928d4872b9d9bb22187ca0426dd8bfab08f26eada0999a71dc81aaff",
+      "source": "https://github.com/ronaldoussoren/pyobjc/blob/38cdf73fc049ef2d176973eff4ac8d5c76b0a34b/pyobjc-core/License.txt"
+    },
+    {
+      "file": "Python-3.12.txt",
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+      "source": "Installed CPython 3.12.11 arm64 runtime LICENSE.txt; https://github.com/python/cpython/tree/v3.12.11"
+    },
+    {
+      "file": "Tk-8.6.txt",
+      "sha256": "2cde822b93ca16ae535c954b7dfe658b4ad10df2a193628d1b358f1765e8b198",
+      "source": "Installed Tk 8.6 demos/license.terms"
+    },
+    {
+      "file": "PyInstaller-6.22.3.txt",
+      "sha256": "0598064c7d2718e38d7914a7d08343b2fa008e3bea9ebba2aa7a6ffa5900dd64",
+      "source": "Installed locked PyInstaller 6.22.3 wheel COPYING.txt, including distribution exception"
+    },
+    {
+      "file": "MaaDeps-ONNX-copyright.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/ONNX/copyright"
+    },
+    {
+      "file": "MaaDeps-abseil-copyright.txt",
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/abseil/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-algorithm-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-algorithm/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-align-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-align/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-array-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-array/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-asio-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-asio/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-assert-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-assert/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-atomic-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-atomic/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-bind-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-bind/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-cmake-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-cmake/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-compat-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-compat/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-concept-check-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-concept-check/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-config-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-config/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-container-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-container/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-container-hash-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-container-hash/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-context-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-context/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-conversion-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-conversion/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-core-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-core/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-date-time-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-date-time/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-describe-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-describe/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-detail-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-detail/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-dll-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-dll/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-exception-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-exception/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-filesystem-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-filesystem/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-function-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-function/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-function-types-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-function-types/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-functional-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-functional/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-fusion-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-fusion/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-headers-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-headers/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-integer-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-integer/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-intrusive-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-intrusive/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-io-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-io/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-iterator-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-iterator/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-lexical-cast-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-lexical-cast/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-move-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-move/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-mp11-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-mp11/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-mpl-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-mpl/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-numeric-conversion-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-numeric-conversion/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-optional-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-optional/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-pool-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-pool/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-predef-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-predef/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-preprocessor-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-preprocessor/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-process-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-process/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-range-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-range/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-regex-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-regex/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-scope-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-scope/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-smart-ptr-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-smart-ptr/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-static-assert-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-static-assert/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-system-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-system/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-throw-exception-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-throw-exception/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-tokenizer-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-tokenizer/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-tuple-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-tuple/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-type-index-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-type-index/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-type-traits-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-type-traits/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-typeof-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-typeof/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-unordered-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-unordered/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-utility-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-utility/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-uuid-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-uuid/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-variant2-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-variant2/copyright"
+    },
+    {
+      "file": "MaaDeps-boost-winapi-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/boost-winapi/copyright"
+    },
+    {
+      "file": "MaaDeps-cppzmq-copyright.txt",
+      "sha256": "7e6db90e2e805c72b3daa77849d1cb5f1f92da0e69750c8a4aa1d86d70704748",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/cppzmq/copyright"
+    },
+    {
+      "file": "MaaDeps-cpuinfo-copyright.txt",
+      "sha256": "8e7e60636c3aa0cb03571a1a841ce5697f9551ff92b3c426c2561613d15ade70",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/cpuinfo/copyright"
+    },
+    {
+      "file": "MaaDeps-cxxopts-copyright.txt",
+      "sha256": "aa324fbe633a96546bebca975fbbab65caa175894bd00cfa13d7335e7363400c",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/cxxopts/copyright"
+    },
+    {
+      "file": "MaaDeps-date-copyright.txt",
+      "sha256": "c90f6c00fb961170560299cbda28ca2d45804913aa8b2a9f36dbb8e0028d6930",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/date/copyright"
+    },
+    {
+      "file": "MaaDeps-dawn-copyright.txt",
+      "sha256": "0493f897193af1796d5054659f45ec7d4c5af648fa67a99f01d30e55cc805abc",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/dawn/copyright"
+    },
+    {
+      "file": "MaaDeps-dlpack-copyright.txt",
+      "sha256": "3e8f6bc39276a586d60c8c5aaece2ff989262181cf2b3d2a128db58f97a9300c",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/dlpack/copyright"
+    },
+    {
+      "file": "MaaDeps-doc-zlib-zlib-LICENSE.txt",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/doc/zlib/zlib/LICENSE"
+    },
+    {
+      "file": "MaaDeps-eigen3-copyright.txt",
+      "sha256": "9af2ed6fee290d31684b61774741b985aa2505e246fc28eca403f407262daf77",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/eigen3/copyright"
+    },
+    {
+      "file": "MaaDeps-flatbuffers-copyright.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/flatbuffers/copyright"
+    },
+    {
+      "file": "MaaDeps-libjpeg-turbo-copyright.txt",
+      "sha256": "ba6bceebcba0fdd35488477c2cca8c4632ce82c74dbfbc87d886ce6fc4433579",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/libjpeg-turbo/copyright"
+    },
+    {
+      "file": "MaaDeps-libpng-copyright.txt",
+      "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/libpng/copyright"
+    },
+    {
+      "file": "MaaDeps-maa-fastdeploy-copyright.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/maa-fastdeploy/copyright"
+    },
+    {
+      "file": "MaaDeps-maa-onnxruntime-copyright.txt",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/maa-onnxruntime/copyright"
+    },
+    {
+      "file": "MaaDeps-ms-gsl-copyright.txt",
+      "sha256": "4c21dc82a1c7186ea754fd59d504c00947953a3401fe8e24eaa44109ef8e2555",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/ms-gsl/copyright"
+    },
+    {
+      "file": "MaaDeps-nlohmann-json-copyright.txt",
+      "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/nlohmann-json/copyright"
+    },
+    {
+      "file": "MaaDeps-opencv4-copyright.txt",
+      "sha256": "8eaec7a7348e332a469dfdb751b7f1c27c0da341571533755c36de26da23babc",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/opencv4/copyright"
+    },
+    {
+      "file": "MaaDeps-optional-lite-copyright.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/optional-lite/copyright"
+    },
+    {
+      "file": "MaaDeps-protobuf-copyright.txt",
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/protobuf/copyright"
+    },
+    {
+      "file": "MaaDeps-re2-copyright.txt",
+      "sha256": "6040cda75d90b1738292a631d89934c411ef7ffd543c4d6a1b7edfc8edf29449",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/re2/copyright"
+    },
+    {
+      "file": "MaaDeps-safeint-copyright.txt",
+      "sha256": "a46919cc8f01eb73f6e4b84af0d41b46b2a33b87c74e864279ef585079f82da4",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/safeint/copyright"
+    },
+    {
+      "file": "MaaDeps-spirv-headers-copyright.txt",
+      "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/spirv-headers/copyright"
+    },
+    {
+      "file": "MaaDeps-spirv-tools-copyright.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/spirv-tools/copyright"
+    },
+    {
+      "file": "MaaDeps-utf8-range-copyright.txt",
+      "sha256": "02de69b64fc36d9e938f418e52723e42f0b2b226d58a9cb3c8dcbdf7059f5074",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/utf8-range/copyright"
+    },
+    {
+      "file": "MaaDeps-vcpkg-boost-copyright.txt",
+      "sha256": "1ee376fc340e0aa6ad6a3581c94126e741468705096ac92263048a21daa86460",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/vcpkg-boost/copyright"
+    },
+    {
+      "file": "MaaDeps-vcpkg-cmake-copyright.txt",
+      "sha256": "1ee376fc340e0aa6ad6a3581c94126e741468705096ac92263048a21daa86460",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/vcpkg-cmake/copyright"
+    },
+    {
+      "file": "MaaDeps-vcpkg-cmake-config-copyright.txt",
+      "sha256": "04b60f99a43bfd7fefdc8364b24aac704a2160cef969b75ba6a38b62dc4c4b70",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/vcpkg-cmake-config/copyright"
+    },
+    {
+      "file": "MaaDeps-vcpkg-get-python-packages-copyright.txt",
+      "sha256": "04b60f99a43bfd7fefdc8364b24aac704a2160cef969b75ba6a38b62dc4c4b70",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/vcpkg-get-python-packages/copyright"
+    },
+    {
+      "file": "MaaDeps-zeromq-copyright.txt",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/zeromq/copyright"
+    },
+    {
+      "file": "MaaDeps-zlib-copyright.txt",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/zlib/copyright"
+    }
+  ]
+}

@@ -63,10 +63,15 @@ def _acceptable_macos_check(result: subprocess.CompletedProcess[str]) -> bool:
     ) and all(line in KNOWN_MAC_PERMISSION_MESSAGES or line in foreground_lines for line in lines)
 
 
-def smoke(root: Path, *, system: str | None = None) -> None:
+def smoke(root: Path, *, system: str | None = None, recognition: bool = False) -> None:
     """Run frozen ``--dry-run`` and platform-aware ``--check`` diagnostics."""
     system = system or sys.platform
     executable = frozen_executable(root, system=system)
+    if recognition:
+        sdk = _run(executable, "--sdk-check")
+        _print_diagnostics("--sdk-check", sdk)
+        if sdk.returncode != 0:
+            raise RuntimeError("Frozen --sdk-check failed.")
     dry_run = _run(executable, "--dry-run")
     _print_diagnostics("--dry-run", dry_run)
     if dry_run.returncode != 0:
@@ -89,9 +94,10 @@ def smoke(root: Path, *, system: str | None = None) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke-check the local frozen AFK Grinder build.")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--recognition", action="store_true", help="Require the local SDK diagnostic")
     args = parser.parse_args()
     try:
-        smoke(args.root.resolve())
+        smoke(args.root.resolve(), recognition=args.recognition)
     except RuntimeError as error:
         print(f"Smoke check failed: {error}", file=sys.stderr)
         raise SystemExit(1) from error

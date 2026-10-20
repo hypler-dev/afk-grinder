@@ -98,6 +98,56 @@ def _entries(bundle: Path, *, allow_symlinks: bool) -> list[Path]:
     return entries
 
 
+def _legal_entries(root: Path) -> list[Path]:
+    files = [root / "LICENSE", root / "THIRD_PARTY_NOTICES.md", root / "docs" / "DEPENDENCIES.md"]
+    for path in files:
+        _require_regular_file(path, "project license/notice")
+    directory = root / "licenses"
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("Missing trusted third-party license directory.")
+    files += [p for p in _entries(directory, allow_symlinks=False) if p.is_file()]
+    return files
+
+
+def embedded_module_names(executable: Path) -> set[str]:
+    """Read the frozen module index without executing its Python code."""
+    from PyInstaller.archive.readers import CArchiveReader
+
+    try:
+        reader = CArchiveReader(str(executable))
+        names: set[str] = set()
+        for name, entry in reader.toc.items():
+            if entry[-1] == "z":
+                names.update(reader.open_embedded_archive(name).toc)
+            elif entry[-1] in {"m", "M"}:
+                names.add(name)
+        if not names:
+            raise ValueError("Frozen module index is empty.")
+        return names
+    except Exception as error:
+        raise ValueError("Could not verify the frozen module inventory; packaging stopped.") from error
+
+
+def _reject_unapproved_sdk(entries: list[Path], executable: Path) -> None:
+    """Do not distribute SDK binaries while corresponding-source review is open."""
+    forbidden = {"maa", "maaagentbinary"}
+    if any(name.split(".", 1)[0].casefold() in forbidden for name in embedded_module_names(executable)):
+        raise ValueError("SDK-bearing artifact publication is blocked pending the notice/source distribution gate.")
+    for path in entries:
+        parts = {part.casefold() for part in path.parts}
+        name = path.name.casefold()
+        if parts & {"maa", "maaagentbinary"} or (
+            name.startswith(("libmaa", "maa")) and name.endswith((".dll", ".dylib", ".so"))
+        ):
+            raise ValueError("SDK-bearing artifact publication is blocked pending the notice/source distribution gate.")
+        if path.is_file() and path.suffix.lower() == ".zip":
+            with zipfile.ZipFile(path) as archive:
+                for name in archive.namelist():
+                    package = PurePosixPath(name).parts[0].split(".", 1)[0].casefold()
+                    if package in forbidden:
+                        raise ValueError("SDK-bearing artifact publication is blocked pending the notice/source distribution gate.")
+
+
 def _archive_name(label: str) -> str:
     suffix = ".zip" if label == "windows-x64" else ".tar.gz"
     return f"AFKGrinder-{label}{suffix}"
@@ -129,6 +179,8 @@ def _metadata(
             "label": label,
             "machine": platform.machine(),
             "package_version": _version(root),
+            "project_license": "MIT",
+            "recognition_sdk": "Not bundled; optional source development dependency.",
             "platform": sys.platform,
             "python_version": platform.python_version(),
             "timestamp_utc": timestamp.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -187,6 +239,9 @@ def package_archive(
     _validate_runtime(label, system or sys.platform, machine or platform.machine())
     bundle, top_name, allow_symlinks = _bundle_for_label(root, label)
     entries = _entries(bundle, allow_symlinks=allow_symlinks)
+    executable = bundle / ("AFKGrinder.exe" if label == "windows-x64" else "Contents/MacOS/AFKGrinder")
+    _reject_unapproved_sdk(entries, executable)
+    legal_files = _legal_entries(root)
     output = (output or root / "artifact-output").resolve()
     if not _inside(output, root) or _inside(output, root / "dist"):
         raise ValueError("--output must be inside the repository and outside dist/.")
@@ -210,6 +265,8 @@ def package_archive(
                 name = (PurePosixPath(top_name) / PurePosixPath(relative.as_posix())).as_posix()
                 _zip_add(archive, path, name)
             archive.writestr("BUILD_INFO.json", build_info)
+            for path in legal_files:
+                archive.write(path, path.relative_to(root).as_posix())
     else:
         with tarfile.open(destination, "w:gz", dereference=False) as archive:
             for path in entries:
@@ -217,6 +274,8 @@ def package_archive(
                 name = (PurePosixPath(top_name) / PurePosixPath(relative.as_posix())).as_posix()
                 _tar_add(archive, path, name)
             _tar_add_bytes(archive, "BUILD_INFO.json", build_info)
+            for path in legal_files:
+                _tar_add(archive, path, path.relative_to(root).as_posix())
     external_build_info = output / "BUILD_INFO.json"
     external_build_info.write_bytes(build_info)
     (output / "SHA256SUMS.txt").write_bytes(_outer_manifest(destination, external_build_info))

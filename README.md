@@ -4,11 +4,17 @@
 
 **Helping kids touch grass by automating their games.**
 
-A local, supervised Windows/macOS input prototype for Roblox, starting with an editable Adopt Me input-check template.
+A free, MIT-licensed Windows/macOS application in development for local Roblox automation, starting with Adopt Me. The implemented baseline is still a supervised input prototype; [BUILD.md](BUILD.md) defines the recognition and care-routine roadmap.
 
 **Current state:** prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. Automated builds provide Windows x64 and macOS Apple Silicon/Intel test bundles. The bundled template tests movement controls; it does not complete Adopt Me tasks. Live Roblox compatibility, representative player hardware, and production installers are not yet validated.
 
-**No runtime LLM, cloud service, API key, login automation, credential storage, screenshots, or action recording.** Roblox sign-in stays manual.
+**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. Window-only, in-memory visual recognition is being added against the blueprint; the input prototype does not capture screenshots.
+
+## License and use at your own risk
+
+AFK Grinder is free and open source under the [MIT License](LICENSE). You may use, modify, and redistribute it, including commercially, while retaining the required copyright and license notice.
+
+The software is provided **as is, without warranty**. The authors and contributors disclaim liability as stated in LICENSE, to the extent permitted by applicable law. You assume the risks of automation, including account restrictions, lost progress, and unintended input. This does not guarantee immunity from every claim or permission under game rules. Dependencies and third-party assets retain their [own licenses and notices](THIRD_PARTY_NOTICES.md).
 
 ## Why this exists
 
@@ -55,6 +61,17 @@ python -m afk_grinder --check
 ```
 
 `--check` returns a nonzero exit code when native permissions/dependencies are missing. It does not grant permissions or establish game compatibility.
+
+Optional local recognition development uses the locked SDK:
+
+```sh
+uv sync --locked --extra build --extra recognition
+uv run --locked --extra build --extra recognition python -m afk_grinder --sdk-check
+```
+
+This checks MaaFw 5.14.3 with synthetic pixels only, CPU configuration, privacy settings, a controller that rejects input, and cancellation. It captures no windows and performs no gameplay actions. The diagnostic runs in a disposable process with a 15-second deadline. No LLM is needed.
+
+CI is configured to verify SDK loading in source and frozen applications on all three desktop targets, then rebuild the downloadable prototype without the optional SDK. SDK-bearing artifact publication remains blocked until its source/notice distribution audit is complete. [Dependency evidence](docs/DEPENDENCIES.md) tracks this work.
 
 ## First supervised test
 

@@ -12,6 +12,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -30,6 +31,16 @@ class PackageBuildTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         (self.root / "pyproject.toml").write_text("[project]\nversion = '0.1.0'\n")
+        (self.root / "LICENSE").write_text("test project license\n")
+        (self.root / "THIRD_PARTY_NOTICES.md").write_text("test notices\n")
+        (self.root / "docs").mkdir()
+        (self.root / "docs" / "DEPENDENCIES.md").write_text("test dependency evidence\n")
+        (self.root / "licenses").mkdir()
+        (self.root / "licenses" / "runtime.txt").write_text("test runtime license\n")
+        # Fake bundle bytes are not executable PyInstaller files. Real local/CI
+        # artifacts exercise the reader; each unit fixture supplies its inventory.
+        self.modules = patch("tools.package_build.embedded_module_names", return_value={"afk_grinder", "json"}).start()
+        self.addCleanup(patch.stopall)
 
     def test_windows_zip_contains_full_runtime_and_metadata(self) -> None:
         bundle = self.root / "dist" / "AFKGrinder"
@@ -47,6 +58,9 @@ class PackageBuildTests(unittest.TestCase):
             self.assertIn("AFKGrinder/AFKGrinder.exe", packaged.namelist())
             self.assertIn("AFKGrinder/_internal/runtime.dat", packaged.namelist())
             self.assertIn("BUILD_INFO.json", packaged.namelist())
+            self.assertEqual(packaged.read("LICENSE"), b"test project license\n")
+            self.assertIn("THIRD_PARTY_NOTICES.md", packaged.namelist())
+            self.assertIn("licenses/runtime.txt", packaged.namelist())
             metadata = json.loads(packaged.read("BUILD_INFO.json"))
         sums = (self.root / "artifact-output" / "SHA256SUMS.txt").read_text()
         external_metadata = json.loads(
@@ -64,6 +78,7 @@ class PackageBuildTests(unittest.TestCase):
         self.assertEqual(metadata["timestamp_utc"], "2026-10-19T12:00:00Z")
         self.assertIn("Unsigned prototype", metadata["warning"])
         self.assertEqual(metadata["validation"], "No game validation performed.")
+        self.assertEqual(metadata["project_license"], "MIT")
 
     @unittest.skipIf(sys.platform == "win32", "Windows CI may not permit symlink fixtures")
     def test_macos_tar_preserves_executable_mode_and_symlink(self) -> None:
@@ -137,6 +152,51 @@ class PackageBuildTests(unittest.TestCase):
 
         self.assertTrue(_acceptable_macos_check(permission_result))
         self.assertFalse(_acceptable_macos_check(unavailable_result))
+
+    def test_sdk_distribution_gate_and_missing_license_fail_before_archive(self) -> None:
+        bundle = self.root / "dist" / "AFKGrinder"
+        bundle.mkdir(parents=True)
+        (bundle / "AFKGrinder.exe").write_bytes(b"test")
+        sdk = bundle / "maa"
+        sdk.mkdir()
+        with self.assertRaisesRegex(ValueError, "distribution gate"):
+            package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+        sdk.rmdir()
+        (self.root / "LICENSE").unlink()
+        with self.assertRaisesRegex(ValueError, "license/notice"):
+            package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+
+    def test_sdk_metadata_alone_is_allowed_but_native_libraries_are_blocked(self) -> None:
+        bundle = self.root / "dist" / "AFKGrinder"
+        bundle.mkdir(parents=True)
+        (bundle / "AFKGrinder.exe").write_bytes(b"test")
+        metadata = bundle / "maafw-5.14.3.dist-info"
+        metadata.mkdir()
+        (metadata / "METADATA").write_text("Name: MaaFw\nVersion: 5.14.3\n")
+        package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+        for name in ("MaaFramework.dll", "libMaaFramework.dylib", "MaaAgentBinary"):
+            path = bundle / name
+            if name == "MaaAgentBinary":
+                path.mkdir()
+            else:
+                path.write_bytes(b"not distributable")
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "distribution gate"):
+                package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+            path.rmdir() if path.is_dir() else path.unlink()
+
+    def test_embedded_sdk_python_cannot_bypass_distribution_gate(self) -> None:
+        bundle = self.root / "dist" / "AFKGrinder"
+        bundle.mkdir(parents=True)
+        (bundle / "AFKGrinder.exe").write_bytes(b"test")
+        for module in ("maa", "maa.resource", "MaaAgentBinary"):
+            self.modules.return_value = {"afk_grinder", module}
+            with self.subTest(module=module), self.assertRaisesRegex(ValueError, "distribution gate"):
+                package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
+        self.modules.return_value = {"afk_grinder"}
+        with zipfile.ZipFile(bundle / "base_library.zip", "w") as archive:
+            archive.writestr("maa/resource.pyc", b"not executable in this test")
+        with self.assertRaisesRegex(ValueError, "distribution gate"):
+            package_archive(self.root, "windows-x64", COMMIT, system="win32", machine="AMD64")
 
 
 if __name__ == "__main__":
