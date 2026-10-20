@@ -96,7 +96,7 @@ None at plan creation. Python/Tk is the bounded proof-of-input prototype; Tauri 
 - `.venv/bin/python tools/build.py`: PASS for the final local macOS arm64 application. Packaged command-line dry run PASS; default packaged dark GUI rendered and was inspected. The first packaged native readiness check exposed missing lazy-imported PyObjC modules; explicit hidden imports fixed this. Final packaged `--check` loads native modules correctly and returns expected exit 1 for missing Accessibility/Input Monitoring/post permissions. Output is not developer-signed/notarized and is not an installer or published release.
 - Controller: native GPT/Sol (OpenAI). Design: `gpt_ui_design`; adapters/UI: `gpt_worker`; independent safety review: `gpt_reviewer`; UI/accessibility/QA/performance review: `gpt_ui_review` (OpenAI Terra roles). GLM unused; no GLM contact attempted, no provider errors or fallback.
 - Initial independent code review found no engine/adapter defects; requested completed evidence ledger and two meaningful regression tests. Both tests now pass. Final independent safety follow-up: PASS, no actionable P1/P2/P3 findings. UI/accessibility/QA/performance review: PASS with assistive-technology and platform hardware gates explicitly open; native Quit callback and main-loop cleanup were added before that final review.
-- Remaining gates: real Windows validation/build; real Roblox input acceptance, focus loss, Escape, Stop, and quit on each platform; clean-machine packaged permissions and install/uninstall; CPU architecture coverage; accessibility with assistive technology; installer creation, signing/notarization, and separately authorized publication.
+- Remaining gates: real Roblox input acceptance, focus loss, Escape, Stop, and quit on each platform; representative player hardware and minimum OS coverage; clean-machine packaged permissions and install/uninstall; accessibility with assistive technology; installer creation, signing/notarization, and separately authorized public release. The automated build follow-up below closes native build/startup coverage for Windows x64 and Mac arm64/x64.
 - Original prototype handoff: no live game input, login, account access, screenshot capture by the application, deployment, or release publication occurred. At that snapshot no prototype commit or push had been requested or performed. The subsequent October 19 instruction authorizes commit/push and private CI test artifacts. Repository remains private `hypler-dev/afk-grinder`; bootstrap HEAD was `25ff352`.
 - Original prototype working-tree snapshot: 3 modified tracked files and 20 new source/documentation files, all owned by this slice. No unrelated dirt observed. `.venv/`, `build/`, and the 29 MB local `dist/AFKGrinder.app` are ignored generated state. The local executable is macOS arm64; its SHA-256 is `ead700c6323e98018648ff4a66375a53449c45813b0480916bdce95106e65fa5`.
 
@@ -109,4 +109,24 @@ None at plan creation. Python/Tk is the bounded proof-of-input prototype; Tauri 
 - Workflow YAML parsing and actionlint v1.7.12: PASS. The validator was downloaded from its official GitHub release and checked against its published SHA-256 file.
 - Native GPT `gpt_worker` (OpenAI Terra) implemented `tools/package_build.py`, `tools/check_build.py`, and `tests/test_package_build.py`. Controller added no-input packaged `--ui-smoke` startup and integrated the workflow. GLM was unused; no GLM contact or fallback occurred.
 - Local pre-push validation: 38 unit tests PASS; compile, tracked/new-file whitespace, artifact validators, and actionlint PASS. Rebuilt Mac arm64 package PASS; packaged dry run, no-input GUI startup, and native readiness all returned 0 outside the sandbox. No native input or permissions changes occurred. Archive metadata, SHA-256 sums, and executable mode checks PASS.
-- Fresh independent CI/helper/CLI/documentation review by native GPT `gpt_reviewer` (OpenAI Terra): PASS, no actionable P1/P2/P3 findings. Workflow push/run and downloadable artifact verification are next. Private CI artifacts are authorized for testing; this does not authorize a public/signed release or live gameplay.
+- Fresh independent CI/helper/CLI/documentation review by native GPT `gpt_reviewer` (OpenAI Terra): PASS, no actionable P1/P2/P3 findings. Private CI artifacts are authorized for testing; this does not authorize a public/signed release or live gameplay.
+- CI implementation committed and pushed as `6cde71ea8f3cd32935956682b0124f9ae9312103` (`ci: build downloadable Windows and macOS apps`). [Run 39359240665](https://github.com/hypler-dev/afk-grinder/actions/runs/39359240665) completed successfully for all three targets.
+- Hosted Windows: 38 unit tests reported, with 2 Mac-symlink fixtures skipped; 8 GUI tests reported, with 1 Mac-Quit test skipped. Both Mac jobs: all 38 unit and 8 GUI tests passed. Every target's packaged dry run, no-input GUI startup, and native readiness check returned 0. No Roblox game session or input was used.
+- All three private artifact records were unexpired and tied to source `6cde71e`; retention is 14 days. Downloaded all three archives and independently verified outer SHA-256 sums, embedded/external metadata, exact source revision, runtime layout, binary architecture, and Mac executable mode plus 23 internal symlinks per Mac archive.
+
+| Target | Verified binary | Archive bytes | GitHub artifact |
+| --- | --- | --- | --- |
+| Windows x64 | PE x64 | 11,567,292 | [12236632318](https://github.com/hypler-dev/afk-grinder/actions/runs/39359240665/artifacts/12236632318) |
+| Mac Apple Silicon | Mach-O arm64 | 11,586,198 | [12236447572](https://github.com/hypler-dev/afk-grinder/actions/runs/39359240665/artifacts/12236447572) |
+| Mac Intel | Mach-O x86_64 | 12,281,019 | [12235998511](https://github.com/hypler-dev/afk-grinder/actions/runs/39359240665/artifacts/12235998511) |
+
+Archive SHA-256 values:
+
+```text
+1905d47e3ea5cb523f9104a8e752c3acf85096c768d99ea5a00de06ebad140e6  AFKGrinder-windows-x64.zip
+f413cb849148a3ddf1fbf9b30a61ec9b74abbed53ca1fb0c5f56fc89907d96f3  AFKGrinder-macos-arm64.tar.gz
+52771d2dfb4553e27e8b7454a1cd55016e12fffd740c12d5bc60016004ae8ff8  AFKGrinder-macos-x64.tar.gz
+```
+
+- The final receipt is documentation-only; source/build artifacts remain tied to `6cde71e`. Documentation-only pushes do not retrigger the path-filtered workflow. No unrelated dirt was observed. `.venv/`, `build/`, `dist/`, and `artifact-output/` remain ignored generated state.
+- GitHub description and README use the user's exact tagline: "Helping kids touch grass by automating their games." Repository visibility remains private. No signing credentials, public releases, app-store submissions, deployment, account/login access, or live game input were used.

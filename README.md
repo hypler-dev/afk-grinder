@@ -4,7 +4,7 @@
 
 A local, supervised Windows/macOS input prototype for Roblox, starting with an editable Adopt Me input-check template.
 
-**Current state:** source prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. The bundled template tests movement controls; it does not complete Adopt Me tasks. Native game compatibility, Windows hardware behavior, and production installers are not yet validated.
+**Current state:** prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. Automated builds provide Windows x64 and macOS Apple Silicon/Intel test bundles. The bundled template tests movement controls; it does not complete Adopt Me tasks. Live Roblox compatibility, representative player hardware, and production installers are not yet validated.
 
 **No runtime LLM, cloud service, API key, login automation, credential storage, screenshots, or action recording.** Roblox sign-in stays manual.
 
@@ -141,8 +141,8 @@ Unit tests use fake adapters and send no OS input. Before claiming support, test
 
 | Platform | Scope |
 | --- | --- |
-| Windows | Prototype backend; native hardware/game validation and installer pending |
-| macOS | Prototype backend; native permission/readiness and local build checks, then supervised game validation |
+| Windows | x64 CI build/startup checks pass; supervised Roblox testing and installer pending |
+| macOS | Apple Silicon/Intel CI build/startup checks pass; supervised Roblox testing and signed distribution pending |
 | Linux | Excluded; [Roblox does not officially support it](https://en.help.roblox.com/hc/en-us/articles/203312800-Computer-Hardware-Operating-System-Requirements) |
 | iOS / Android | Feasibility research only; no implementation commitment |
 
