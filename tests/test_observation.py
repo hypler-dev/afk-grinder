@@ -40,7 +40,9 @@ class ObservationTests(unittest.TestCase):
         changes = [dict(native_content=Rect(-99, 50, 16, 9)), dict(monitor_id="monitor-B"),
                    dict(window_id="window-2"), dict(target=replace(self.layout.target, pid=11)),
                    dict(physical_size=(16, 9), scale=(1, 1)),
-                   dict(native_content=Rect(-100, 50, 32, 18), scale=(1, 1))]
+                   dict(native_content=Rect(-100, 50, 32, 18), scale=(1, 1)),
+                   dict(display_scale=(1.5, 1.5)),
+                   dict(region_kind="window-unverified", content_verified=False)]
         for fields in changes:
             with self.subTest(fields=fields):
                 self.tracker = ObservationTracker()
@@ -87,7 +89,9 @@ class ObservationTests(unittest.TestCase):
 
     def test_bad_metadata_and_frame_buffers_rejected(self):
         for change in (dict(scale=(float("nan"), 2)), dict(physical_size=(100000, 100000)),
-                       dict(scale=(1, 1)), dict(monitor_id="")):
+                       dict(scale=(1, 1)),
+                       dict(display_scale=(True, 1)), dict(region_kind="unknown"),
+                       dict(region_kind="client", content_verified=False), dict(monitor_id="")):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 replace(self.layout, **change)
         with self.assertRaises(ValueError):

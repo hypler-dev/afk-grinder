@@ -56,6 +56,10 @@ Observation metadata separates physical BGR capture dimensions, reference coordi
 
 The tracker clears calibration after capture failure, stale/future/out-of-order frames, target/window replacement, or any bounds, monitor, size or scale change. Old callbacks and observations cannot remain current after a newer frame. Calibration requires a fresh frame. This pure geometry layer sends no input and does not establish anchors, gameplay readiness or care-task completion. Native capture and calibration UI acceptance remain separate gates.
 
+The capture-to-layout bridge derives physical/native conversion from measured frame and native rectangle extents. Display-DPI metadata remains a separate layout field: Windows physical client pixels can map 1:1 to native input while the display reports 150% scaling; Retina capture can map 2:1. DPI-only changes invalidate layout equality. Raw Mac window captures retain their unverified-content flag through geometry checks.
+
+Recognition Setup supports a 1280×720 (16:9) geometry-reference demo. A user can drag an image-bounded area, or focus the preview and press Enter/Space to create an area, then move it with arrows, resize with Shift+arrows, or reset with R. Historical previews remain editable references after current observation/calibration expires at 0.5 seconds. Refresh and check area retains only the selected rectangle and source layout while clearing old pixels/results, then requests a fresh capture. Only a fresh returned frame with the same target/window/bounds/monitor/physical conversion/display scale/region metadata can establish snapshot geometry. New captures, target changes, failures, cancellation and close clear pending geometry. This does not configure anchors/targets, verify game content bounds, establish a supported minimum resolution or enable input.
+
 ## Compatibility and migration
 
 ### Native preview and restricted pack foundations

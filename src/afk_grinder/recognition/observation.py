@@ -39,15 +39,34 @@ class Layout:
     physical_size: tuple[int, int]
     monitor_id: str
     scale: tuple[float, float]
+    display_scale: tuple[float, float] | None = None
+    region_kind: str = "client"
+    content_verified: bool = True
 
     def __post_init__(self):
-        if not self.target.is_roblox or not self.window_id or not self.monitor_id:
+        if (not self.target.is_roblox or type(self.window_id) is not str or not self.window_id
+                or type(self.monitor_id) is not str or not self.monitor_id):
             raise ValueError("A Roblox target, stable window ID, and monitor ID are required.")
-        if (len(self.physical_size) != 2 or any(type(v) is not int or v <= 0 for v in self.physical_size)
+        if (type(self.physical_size) is not tuple or len(self.physical_size) != 2
+                or any(type(v) is not int or v <= 0 for v in self.physical_size)
                 or math.prod(self.physical_size) > MAX_PIXELS):
             raise ValueError("Capture size is invalid or exceeds the pixel limit.")
-        if len(self.scale) != 2 or not _finite(*self.scale) or min(self.scale) <= 0:
+        if (type(self.scale) is not tuple or len(self.scale) != 2
+                or not _finite(*self.scale) or min(self.scale) <= 0):
+            raise ValueError("Both physical/native scales must be finite and positive.")
+        display_scale = self.scale if self.display_scale is None else self.display_scale
+        if (type(display_scale) is not tuple or len(display_scale) != 2
+                or not _finite(*display_scale) or min(display_scale) <= 0):
             raise ValueError("Both display scales must be finite and positive.")
+        object.__setattr__(self, "display_scale", display_scale)
+        if self.region_kind not in {"client", "window-unverified"}:
+            raise ValueError("Capture region must be client or window-unverified.")
+        if type(self.content_verified) is not bool:
+            raise ValueError("Capture content verification must be boolean.")
+        if self.region_kind == "client" and not self.content_verified:
+            raise ValueError("A client capture must have verified content bounds.")
+        if self.region_kind == "window-unverified" and self.content_verified:
+            raise ValueError("An unverified window preview cannot claim verified content bounds.")
         # Permit only rounding at a physical pixel boundary, never inferred DPI.
         for actual, logical, scale in zip(self.physical_size,
                                            (self.native_content.width, self.native_content.height), self.scale):

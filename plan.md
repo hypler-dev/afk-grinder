@@ -190,7 +190,7 @@ Authority: accepted intent.md and the owner-supplied BUILD.md. The owner explici
 | Milestone | Required outcome | Current acceptance |
 | --- | --- | --- |
 | 0 | Preserve baseline; pin/load/package MaaFw; dependency/license inventory | In progress |
-| 1 | Window-only capture/calibration and tested coordinate/layout invalidation; no input | Pending |
+| 1 | Window-only capture/calibration and tested coordinate/layout invalidation; no input | In progress; geometry UI implemented, native capture/anchor acceptance pending |
 | 2 | Restricted packs, local recognition, held-out labeled fixture/state evaluation | Pending |
 | 3 | One verified indoor care task with guarded action/outcome/cancellation evidence | Pending |
 | 4 | Additional independently verified indoor tasks and bounded recovery | Pending |
@@ -307,3 +307,30 @@ c192416a7f65034a65d93a1dbdad94b5cc174f7b5c9c862c4142edf8bf21a613  AFKGrinder-mac
 - A private local Mac arm64 build passed frozen SDK, spawned SDK-service, dry-run UI and native-readiness smoke checks. Its diagnostic inventory reported 495 embedded modules, 54 unique native contents and 226 logical legal-file paths including aliases. This was a dirty development checkout, not an exact-revision distribution receipt. The default SDK-free bundle was then rebuilt and passed the SDK publication guard.
 - CI now records the inventory after private SDK verification and uploads JSON separately from the SDK-free test archive. `actionlint` passes. New exact-revision Windows/both-Mac inventory artifacts remain pending until the next run; existing `0fd7d29` test artifacts predate this tool.
 - Producer: native `gpt_worker` (OpenAI Terra high), with Sol owning CI integration and validation. Fresh independent `gpt_reviewer` (OpenAI Terra xhigh) final PASS after a P3 self-link traceback was converted to a clean rejection; six targeted tests, compilation and whitespace checks pass. No GLM contact occurred; the previously recorded stale/future registry gate remains unchanged. No SDK-bearing binaries, game images, credentials or public release were uploaded. Corresponding-source, replacement, attribution and final distribution-review gates remain open in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
+
+### Corrected capture and SDK inventory CI receipt
+
+- Reviewed fixes were pushed as `b3bd472` (Mac bridge ownership) and `71c2809e6851d4c8ad8332756072ec63f7c40111` (SDK inventory). [Run 39406697042](https://github.com/hypler-dev/afk-grinder/actions/runs/39406697042) passed all three targets. Both Macs passed the real-Quartz synthetic conversion/cleanup regression; Windows skips that Mac-only test. No real screen capture or game input runs in CI.
+- Downloaded and verified all three SDK-free application artifacts and the three separate `sdk-inventory.v2` JSON artifacts against exact source/labels. Application metadata/hashes, architecture, all 95 notice hashes, SDK-exclusion guard and Mac executable modes pass; arm64 deep strict ad-hoc signature verification passes. Local verification receipt: `/private/tmp/afk-grinder-ci-39406697042/VERIFICATION.json` (temporary).
+
+| Target | Application artifact | SDK JSON artifact | Modules / unique native contents / logical legal paths |
+| --- | --- | --- | --- |
+| Windows x64 | `12257612285` | `12257247386` | 412 / 109 / 111 |
+| Mac arm64 | `12257182593` | `12257052568` | 493 / 106 / 226 |
+| Mac x64 | `12257092578` | `12257132654` | 493 / 106 / 226 |
+
+```text
+dacccaddd43aad57ced6984d0a813cf07cb8cfac601cbfd0b08c5abd5b8e8688  AFKGrinder-windows-x64.zip
+ba500607fd69a4fc74fe27754a0ce525e554da71c88572eaff40f787b460476e  AFKGrinder-macos-arm64.tar.gz
+95b2bbac74e6b0af97fc3b65547a20334fb6de7dc42869856f7752c402b6b625  AFKGrinder-macos-x64.tar.gz
+```
+
+- These static SDK inventories identify actual frozen contents; they do not map every native component to complete corresponding source or prove library replacement. SDK-bearing application publication remains blocked. The corrected application artifacts precede the separate M1 ROI changes below.
+
+### M1 reference geometry and editable preview
+
+- Added a no-input capture-to-layout bridge that keeps display DPI separate from measured physical/native conversion. Four new bridge checks and eight observation checks cover Windows 150% DPI with 1:1 native pixels, Mac Retina 2:1/negative origins, raw-window uncertainty and DPI-only/layout invalidation. Fresh independent `gpt_reviewer` (OpenAI Terra xhigh) final PASS; an existing invalid-scale regression was retained after a review finding.
+- Native Recognition Setup adds image-bounded 16:9 area selection, keyboard initialization/movement/resize/reset and fresh matching-layout recapture before snapshot geometry is accepted. A historical image remains editable, while expired observation/calibration cannot remain current. Mac raw-window uncertainty survives the check; anchors and targets remain explicitly unconfigured. This is geometry-reference evidence, not gameplay calibration or input authorization.
+- Producer: `gpt_worker` (OpenAI Terra high), separate bounded `gpt_ui_design` direction, and Sol integration. Fresh `gpt_ui_review` (OpenAI Terra xhigh) found human selection incorrectly constrained to 0.5 seconds, missing keyboard initialization, contradictory historical-state copy and an unusably small minimum-size preview. All were repaired; final independent review PASS, no P1/P2/P3. Root validation: 123 unit tests, 10 input-GUI and 12 recognition-GUI checks pass; compilation, actionlint and whitespace pass. The minimum-window check now covers all controls/status labels and at least 96 pixels of preview height at 440×560 with a historical raw-Mac snapshot and long safe error. The rebuilt SDK-free local app passes frozen dry run, spawned-service UI, native readiness and deep strict ad-hoc signature verification. Exact-revision M1 CI and native capture/anchor acceptance remain pending.
+- This M1 slice owns exactly `plan.md`, `spec.md`, `src/afk_grinder/recognition/observation.py`, `src/afk_grinder/recognition/frame_geometry.py`, `src/afk_grinder/ui_recognition.py`, `tests/test_observation.py`, `tests/test_frame_geometry.py` and `tools/smoke_recognition_ui.py`. No unrelated dirt observed. Input remains stopped; no credentials, native game input, saved game pixels, transactions, SDK-bearing binary upload, signing credentials, deploy or public binary release occurred. The earlier owner-approved Screen Recording grant is recorded separately above.
+- M2 research only: an isolated local MaaFw `JTemplateMatch` probe matched an original synthetic 32×24 pattern at expected box `(400, 180, 32, 24)`, score `0.999999`, using an in-memory 1280×720 BGR frame, CPU resource and a controller whose input/shell/app callbacks all reject. The first empty-pipeline-directory bundle failed; pinned upstream `PipelineResMgr` requires at least one JSON file, and an engine-owned empty JSON object resolved loading. The outer child deadline was 15 seconds; persistent SDK logs/images were disabled and the private synthetic template directory was deleted. This is not production recognition integration, held-out fixture evaluation, game-state or care-task proof.
