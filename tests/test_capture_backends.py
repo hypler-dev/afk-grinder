@@ -6,7 +6,9 @@ from contextlib import nullcontext
 from pathlib import Path
 import sys
 import tracemalloc
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, call, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -236,6 +238,68 @@ class WindowsCaptureTests(unittest.TestCase):
 
 
 class MacOSCaptureTests(unittest.TestCase):
+    def test_new_worker_initializes_display_environment_without_activation(self) -> None:
+        application = Mock()
+        application.setActivationPolicy_.return_value = True
+        application.activationPolicy.side_effect = [0, 2]
+        appkit = SimpleNamespace(
+            NSApp=lambda: None,
+            NSApplication=Mock(sharedApplication=Mock(return_value=application)),
+            NSApplicationActivationPolicyProhibited=2,
+        )
+        imports = {"AppKit": appkit, "Quartz": object(), "ScreenCaptureKit": object(), "objc": object()}
+        with patch("afk_grinder.capture.macos.sys.platform", "darwin"), \
+                patch("afk_grinder.capture.macos.importlib.import_module", side_effect=imports.__getitem__):
+            MacOSCapture()
+        appkit.NSApplication.sharedApplication.assert_called_once_with()
+        self.assertEqual(application.method_calls, [
+            call.activationPolicy(), call.setActivationPolicy_(2), call.activationPolicy(),
+        ])
+
+    def test_existing_application_policy_is_preserved(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        application = Mock()
+        adapter._AppKit = SimpleNamespace(NSApp=lambda: application, NSApplication=Mock())
+        adapter._initialize_display_environment()
+        adapter._AppKit.NSApplication.sharedApplication.assert_not_called()
+        self.assertEqual(application.method_calls, [])
+
+    def test_already_prohibited_worker_needs_no_policy_change(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        application = Mock()
+        application.activationPolicy.return_value = 2
+        adapter._AppKit = SimpleNamespace(
+            NSApp=lambda: None,
+            NSApplication=Mock(sharedApplication=Mock(return_value=application)),
+            NSApplicationActivationPolicyProhibited=2,
+        )
+        adapter._initialize_display_environment()
+        application.setActivationPolicy_.assert_not_called()
+
+    def test_initialization_refuses_non_main_thread_before_native_imports(self) -> None:
+        with patch("afk_grinder.capture.macos.sys.platform", "darwin"), \
+                patch("afk_grinder.capture.macos.threading.current_thread", return_value=object()), \
+                patch("afk_grinder.capture.macos.importlib.import_module") as imports:
+            with self.assertRaises(CaptureError) as raised:
+                MacOSCapture()
+        self.assertEqual(raised.exception.diagnostic.stage, "initialization")
+        imports.assert_not_called()
+
+    def test_failed_background_policy_blocks_capture(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        application = Mock()
+        application.setActivationPolicy_.return_value = False
+        application.activationPolicy.return_value = 0
+        adapter._AppKit = SimpleNamespace(
+            NSApp=lambda: None,
+            NSApplication=Mock(sharedApplication=Mock(return_value=application)),
+            NSApplicationActivationPolicyProhibited=2,
+        )
+        with self.assertRaises(CaptureError) as raised:
+            adapter._at_stage("initialization", adapter._initialize_display_environment)
+        self.assertEqual(raised.exception.diagnostic.stage, "initialization")
+        self.assertEqual(application.activationPolicy.call_count, 2)
+
     @staticmethod
     def _fake_capture(bindings: list[WindowBinding], result: tuple[int, int, bytes]) -> MacOSCapture:
         adapter = object.__new__(MacOSCapture)

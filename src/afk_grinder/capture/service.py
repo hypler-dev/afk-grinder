@@ -16,10 +16,13 @@ import time
 from typing import Any
 
 from afk_grinder.models import Target
+from afk_grinder.recognition.maa_adapter import SDKError
 from . import CaptureDiagnostic, CaptureError, CapturedWindow, capture_error_type
 
 MAX_FRAME_BYTES = 16_000_000 * 3
 MAX_HEADER_BYTES = 16_384
+OPTIONAL_SDK_UNAVAILABLE_MESSAGE = "Recognition is optional. Install the locked recognition extra first."
+GENERIC_WORKER_ERROR_MESSAGE = "Preview or SDK check failed. No input was sent."
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,8 @@ def _worker(connection: Connection, operation: str, target: Target | None,
                 backend = WindowsCapture()
             else:
                 raise RuntimeError("Window capture requires Windows or macOS.")
+            if time.monotonic() >= deadline:
+                return
             frame = backend.snapshot(target)
             header = {"kind": "frame", "window_id": frame.window_id,
                       "native_rect": frame.native_rect, "physical_size": frame.physical_size,
@@ -71,8 +76,15 @@ def _worker(connection: Connection, operation: str, target: Target | None,
             diagnostic = error.diagnostic if isinstance(error, CaptureError) else CaptureDiagnostic(
                 code="unexpected", stage="worker", error_type=capture_error_type(error)
             )
+            message = (
+                OPTIONAL_SDK_UNAVAILABLE_MESSAGE
+                if operation == "sdk" and isinstance(error, SDKError)
+                and str(error) == OPTIONAL_SDK_UNAVAILABLE_MESSAGE
+                else GENERIC_WORKER_ERROR_MESSAGE
+            )
             connection.send_bytes(json.dumps({
-                "kind": "error", "error": str(error)[:500], "diagnostic": diagnostic.as_ipc(),
+                "kind": "error", "error": message,
+                "diagnostic": diagnostic.as_ipc(),
             }).encode("utf-8"))
         except (OSError, EOFError, BrokenPipeError):
             pass

@@ -11,7 +11,7 @@ The first corrected CI build is [run 39363752157](https://github.com/hypler-dev/
 3. Before any live input, verify the running executable belongs to the extracted, checksum-verified artifact. In Terminal run `ps -axo pid=,comm= | grep '[A]FKGrinder.app/Contents/MacOS/AFKGrinder'`. Require exactly one result and compare its full path with this artifact's `AFKGrinder.app/Contents/MacOS/AFKGrinder`; stop if it points to another copy such as a local `dist` build. Confirm the adjacent `BUILD_INFO.json` source commit matches the selected successful CI run. Record that path and source with the test results.
 4. In Adopt Me, stand on clear ground, close chat and menus, and dismiss incoming trade/purchase prompts. Do not use this test for purchases or trades.
 5. In AFK Grinder, select Live input and refresh readiness. Missing Accessibility/Input Monitoring permission is a blocked test, not a pass. The app must not grant permissions itself.
-6. Click **Bind Roblox after 3 seconds**, then manually switch to Roblox during the three-second countdown. Return to AFK Grinder and confirm a Roblox target is bound. Repeat binding if Roblox restarts.
+6. Wait for native discovery to report ready. A uniquely verified Roblox window binds automatically while AFK Grinder stays foreground; no foreground-switch countdown is used. If no target is found, wait or use **Retry**. If multiple verified Roblox windows are listed, explicitly select the intended window. Automatic binding never arms input, starts a run, acknowledges gameplay, or resumes an interrupted run. Repeat discovery if Roblox restarts.
 
 ## Movement
 
@@ -32,3 +32,5 @@ Test GUI Stop separately if needed. A failed release must be reported as a failu
 ## Evidence
 
 Record build/source commit, macOS version, architecture, permission readiness, and PASS/FAIL/INCONCLUSIVE for movement, focus-loss cancellation, Escape cancellation, and held-key cleanup. The actual Mac focus identity and UI result should agree. Do not publish account names, session data, private game screenshots, or other players' information. Windows and unattended gameplay remain separate tests.
+
+The staged `13fa083` candidate still has a failed native capture result. The subsequent source correction passes elevated no-capture bootstrap, 199 unit tests, and rebuilt local frozen launcher checks after correcting an optional-SDK message regression. These checks do not establish native capture or live-input acceptance; a verified replacement and supervised native retry remain required.

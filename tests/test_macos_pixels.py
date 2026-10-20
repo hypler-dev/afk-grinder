@@ -1,4 +1,4 @@
-"""Exercise real PyObjC conversion using synthetic pixels, never screen capture."""
+"""Exercise real PyObjC worker initialization and synthetic pixels, never capture."""
 
 from __future__ import annotations
 
@@ -10,6 +10,27 @@ import unittest
 
 @unittest.skipUnless(sys.platform == "darwin" and importlib.util.find_spec("Quartz"), "Requires macOS Quartz")
 class MacOSPixelBridgeTests(unittest.TestCase):
+    def test_capture_worker_display_bootstrap_without_capture_or_activation(self) -> None:
+        program = """
+import AppKit
+from afk_grinder.capture.macos import MacOSCapture
+assert AppKit.NSApp() is None
+adapter = MacOSCapture()
+application = AppKit.NSApp()
+assert application is not None
+assert application.activationPolicy() == AppKit.NSApplicationActivationPolicyProhibited
+assert not application.isActive()
+assert len(application.windows()) == 0
+assert len(AppKit.NSScreen.screens()) > 0
+print('background display initialization passed')
+"""
+        result = subprocess.run(
+            [sys.executable, "-X", "faulthandler", "-c", program],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "background display initialization passed")
+
     def test_synthetic_conversion_and_bridge_cleanup_in_child(self) -> None:
         # A child contains a bridge ownership regression: an explicit release
         # previously crashed during garbage collection rather than conversion.

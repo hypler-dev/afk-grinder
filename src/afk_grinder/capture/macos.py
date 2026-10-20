@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import threading
 from math import isfinite
 from time import monotonic
 from typing import Any
@@ -31,14 +32,34 @@ class MacOSCapture:
     def __init__(self) -> None:
         if sys.platform != "darwin":
             raise RuntimeError("macOS capture requires macOS (sys.platform == 'darwin').")
+        if threading.current_thread() is not threading.main_thread():
+            raise CaptureError("macOS capture must initialize on the worker's main thread.",
+                               code="unavailable", stage="initialization")
         try:
+            self._AppKit = importlib.import_module("AppKit")
             self._Quartz = importlib.import_module("Quartz")
             self._ScreenCaptureKit = importlib.import_module("ScreenCaptureKit")
             self._objc = importlib.import_module("objc")
         except ImportError as error:
             raise RuntimeError(
-                "macOS capture requires PyObjC Quartz, objc, and ScreenCaptureKit."
+                "macOS capture requires PyObjC AppKit, Quartz, objc, and ScreenCaptureKit."
             ) from error
+        self._at_stage("initialization", self._initialize_display_environment)
+
+    def _initialize_display_environment(self) -> None:
+        # Spawned capture workers do not inherit the launcher's NSApplication.
+        # Apple's sharedApplication initializes the display/WindowServer
+        # connection required by ScreenCaptureKit's window content filter.
+        # Never run/finish launching or activate this background application.
+        if self._AppKit.NSApp() is not None:
+            return
+        application = self._AppKit.NSApplication.sharedApplication()
+        policy = self._AppKit.NSApplicationActivationPolicyProhibited
+        if application is not None and application.activationPolicy() != policy:
+            application.setActivationPolicy_(policy)
+        if application is None or application.activationPolicy() != policy:
+            raise CaptureError("macOS capture worker could not initialize without activation.",
+                               code="unavailable", stage="initialization")
 
     def discover(self, target: Target) -> WindowBinding:
         self._at_stage("initialization", self._require_roblox, target)

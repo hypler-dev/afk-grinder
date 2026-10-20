@@ -7,9 +7,10 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from afk_grinder.capture import CapturedWindow
+from afk_grinder.capture import CaptureError, CapturedWindow
 from afk_grinder.capture.service import BackgroundJob, JobResult, MAX_FRAME_BYTES, _read_result, _worker
 from afk_grinder.models import Target
+from afk_grinder.recognition.maa_adapter import SDKError
 
 TARGET = Target(123, "window", "RobloxPlayer", "com.roblox.RobloxPlayer")
 
@@ -160,6 +161,26 @@ class CaptureServiceTests(unittest.TestCase):
         self.assertLessEqual(len(pipe.sent[1]), MAX_FRAME_BYTES)
         self.assertTrue(pipe.closed)
 
+    def test_capture_deadline_after_backend_construction_skips_snapshot(self):
+        pipe = Pipe()
+        backend = Mock()
+        clock = [10.0]
+
+        def create_backend():
+            clock[0] = 11.0
+            return backend
+
+        with patch("afk_grinder.capture.service.sys.platform", "darwin"), \
+             patch("afk_grinder.capture.macos.MacOSCapture", side_effect=create_backend), \
+             patch("afk_grinder.capture.service.time.monotonic", side_effect=lambda: clock[0]):
+            gate = threading.Event()
+            gate.set()
+            _worker(pipe, "capture", TARGET, gate, 11.0)
+
+        backend.snapshot.assert_not_called()
+        self.assertEqual(pipe.sent, [])
+        self.assertTrue(pipe.closed)
+
     def test_failure_packet_preserves_actionable_permission_message(self):
         result = _read_result(Pipe([b'{"kind":"error","error":"Screen Recording permission is required"}']), "capture", TARGET)
         self.assertIn("Screen Recording", result.error)
@@ -188,23 +209,79 @@ class CaptureServiceTests(unittest.TestCase):
             with self.subTest(header=header), self.assertRaisesRegex(ValueError, "diagnostic"):
                 _read_result(Pipe([header]), "capture", TARGET)
 
-    def test_unexpected_worker_error_exports_only_allowlisted_diagnostic(self):
+    def test_worker_errors_export_generic_message_and_allowlisted_diagnostic(self):
+        cases = (
+            (CaptureError("SENSITIVE_CAPTURE_MARKER /private/window native detail", code="permission",
+                          stage="preflight"),
+             {"code": "permission", "stage": "preflight", "error_type": "capture_error"}),
+            (AttributeError("SENSITIVE_EXCEPTION_MARKER /private/window native detail"),
+             {"code": "unexpected", "stage": "worker", "error_type": "attribute_error"}),
+        )
+        for error, expected_diagnostic in cases:
+            with self.subTest(error=type(error).__name__):
+                pipe = Pipe()
+                backend = Mock()
+                backend.snapshot.side_effect = error
+                with patch("afk_grinder.capture.service.sys.platform", "darwin"), \
+                     patch("afk_grinder.capture.macos.MacOSCapture", return_value=backend):
+                    gate = threading.Event()
+                    gate.set()
+                    _worker(pipe, "capture", TARGET, gate, time.monotonic() + 1)
+
+                serialized = pipe.sent[0].decode("utf-8")
+                header = json.loads(serialized)
+                self.assertEqual(header["error"], "Preview or SDK check failed. No input was sent.")
+                self.assertEqual(header["diagnostic"], expected_diagnostic)
+                self.assertNotIn("SENSITIVE_", serialized)
+                self.assertNotIn("/private/", serialized)
+                self.assertNotIn("native detail", serialized)
+                result = _read_result(Pipe(pipe.sent), "capture", TARGET)
+                self.assertEqual(result.error, "Preview or SDK check failed. No input was sent.")
+                self.assertEqual(result.diagnostic.as_ipc(), expected_diagnostic)
+                self.assertNotIn("SENSITIVE_", result.error)
+                self.assertNotIn("/private/", result.error)
+                self.assertNotIn("native detail", result.error)
+
+    def test_known_optional_sdk_absence_preserves_fixed_allowlisted_message(self):
         pipe = Pipe()
-        backend = Mock()
-        backend.snapshot.side_effect = AttributeError("/private/user/window title")
-        with patch("afk_grinder.capture.service.sys.platform", "darwin"), \
-             patch("afk_grinder.capture.macos.MacOSCapture", return_value=backend):
+        known_absence = "Recognition is optional. Install the locked recognition extra first."
+        with patch("afk_grinder.recognition.maa_adapter.probe_sdk", side_effect=SDKError(known_absence)):
             gate = threading.Event()
             gate.set()
-            _worker(pipe, "capture", TARGET, gate, time.monotonic() + 1)
+            _worker(pipe, "sdk", None, gate, time.monotonic() + 1)
 
         header = json.loads(pipe.sent[0])
+        self.assertEqual(header["error"], known_absence)
         self.assertEqual(header["diagnostic"], {
-            "code": "unexpected", "stage": "worker", "error_type": "attribute_error",
+            "code": "unexpected", "stage": "worker", "error_type": "runtime_error",
         })
-        self.assertNotIn("private", json.dumps(header["diagnostic"]))
-        result = _read_result(Pipe(pipe.sent), "capture", TARGET)
-        self.assertEqual(result.diagnostic.error_type, "attribute_error")
+        result = _read_result(Pipe(pipe.sent), "sdk", None)
+        self.assertEqual(result.error, known_absence)
+        self.assertEqual(result.diagnostic.as_ipc(), header["diagnostic"])
+
+    def test_unrecognized_sdk_error_exports_generic_message_without_details(self):
+        pipe = Pipe()
+        error = SDKError("SENSITIVE_SDK_MARKER /private/window native detail")
+        with patch("afk_grinder.recognition.maa_adapter.probe_sdk", side_effect=error):
+            gate = threading.Event()
+            gate.set()
+            _worker(pipe, "sdk", None, gate, time.monotonic() + 1)
+
+        serialized = pipe.sent[0].decode("utf-8")
+        header = json.loads(serialized)
+        self.assertEqual(header["error"], "Preview or SDK check failed. No input was sent.")
+        self.assertEqual(header["diagnostic"], {
+            "code": "unexpected", "stage": "worker", "error_type": "runtime_error",
+        })
+        self.assertNotIn("SENSITIVE_", serialized)
+        self.assertNotIn("/private/", serialized)
+        self.assertNotIn("native detail", serialized)
+        result = _read_result(Pipe(pipe.sent), "sdk", None)
+        self.assertEqual(result.error, "Preview or SDK check failed. No input was sent.")
+        self.assertEqual(result.diagnostic.as_ipc(), header["diagnostic"])
+        self.assertNotIn("SENSITIVE_", result.error)
+        self.assertNotIn("/private/", result.error)
+        self.assertNotIn("native detail", result.error)
 
     def test_error_or_hung_teardown_never_returns_success(self):
         context, _, _, process = self.context([b'{"kind":"sdk","report":{"native_input":false}}'])
