@@ -1,13 +1,13 @@
 <!-- intent-driven-delivery:intent:v1 -->
-# Intent: Bootstrap AFK Grinder
+# Intent: AFK Grinder desktop prototype
 
 Status: accepted
 Authority: this file
 Owner: Jeff / hypler-dev
-Accepted by: Jeff, through the October 19, 2026 chat instruction to create a GitHub repository with Windows/macOS installers planned, Linux excluded, and mobile research deferred
+Accepted by: Jeff, through the October 19, 2026 chat instructions to build the prototype, commit/push it, and set up downloadable Windows/macOS automated builds
 Last updated: 2026-10-19
 
-Acceptance covers only repository bootstrap and desktop platform targets. Detailed application design remains proposed.
+Acceptance covers the bounded desktop prototype, its commit/push to the private repository, and automated Windows/macOS test-binary builds. Signed releases, production installers, mobile delivery, and unattended gameplay claims remain outside this slice.
 
 ## Problem and evidence
 
@@ -15,9 +15,11 @@ The user currently uses macOS Automator for Roblox actions and wants a shared ap
 
 ## Desired outcome
 
-Create a private GitHub repository named `afk-grinder`, connect this local directory, and publish an initial project scope. Record Windows and macOS installer binaries as delivery targets. Keep iOS and Android as research, with Linux excluded.
+Build a local Windows/macOS prototype that executes bounded keyboard and mouse actions only against an explicitly selected foreground Roblox process, stops on focus loss or Escape, and releases held inputs on exit. Provide dry-run execution and a small editable action template. Roblox login stays manual. No runtime LLM is required.
 
-The eventual application should allow users to record, edit, test, and update action templates without rebuilding the application. Architecture, specific task coverage, and implementation acceptance criteria remain proposed until a bounded implementation packet is accepted.
+Commit and push the reviewed prototype, then automate private downloadable test builds for Windows x64 and macOS Apple Silicon/Intel. Record the source revision, target architecture, and checksums with each artifact. The project began as a fun family project for Jeff's kids, with the aim of spending less time on repetitive game chores and more time outdoors.
+
+The eventual application should allow users to record, edit, test, and update action templates without rebuilding the application. Recording, visual recognition, and specific Adopt Me gameplay routines remain future work. The Python/Tk prototype establishes the deterministic safety and input seam before a final production framework is selected.
 
 ## Users and systems
 
@@ -29,19 +31,21 @@ The eventual application should allow users to record, edit, test, and update ac
 
 ## Constraints
 
-- The current authorized slice is repository initialization and scope documentation.
+- The current authorized slice includes prototype commit/push, GitHub Actions execution, and private test-binary artifact uploads in addition to implementation, documentation, and validation.
 - Keep the repository private by default; no public publication was requested.
 - Produce no application or installer claims without platform-specific validation.
 - Do not add Linux delivery or imply that desktop framework support proves mobile automation support.
 - Keep credentials, input recordings, screenshots, local profiles, and generated installers out of source control.
 - Roblox sign-in remains manual. The user explicitly removed login automation from scope on October 19, 2026; do not collect credentials, manage login sessions, or record/play back authentication screens.
-- Repository creation and its initial push are authorized. Signing, publishing binaries, app-store submission, and live gameplay execution are separate future work.
+- Process focus cannot establish whether Roblox shows gameplay, login, chat, or an in-game purchase. Require an explicit signed-in/gameplay acknowledgment and a short bounded run; do not claim screen-state recognition.
+- Private CI test artifacts are authorized. Keep CI permissions minimal, use hosted target-OS runners, and do not add signing credentials, public releases, app-store submissions, or live gameplay execution.
 
 ## Non-goals
 
-- Implementing or running gameplay automation in this bootstrap.
-- Building or publishing installer binaries in this bootstrap.
-- Committing to mobile delivery, a production framework, or an input library.
+- Running live gameplay automation during development or claiming Adopt Me task completion.
+- Publishing production installers, signed binaries, public releases, or app-store submissions.
+- Committing to mobile delivery or a final production framework.
+- Login, screen recording, action recording, visual recognition, account switching, or LLM orchestration.
 - Client injection, memory access, anti-cheat bypass, credential collection, automated purchases, or automated trades.
 
 ## Assumptions and verified facts
@@ -64,16 +68,19 @@ The eventual application should allow users to record, edit, test, and update ac
 
 ## Acceptance evidence
 
-- Local Git repository uses `main` and has a clean initial commit containing only the bootstrap files.
-- GitHub repository is private, owned by `hypler-dev`, and named `afk-grinder`.
-- Local `origin` points to that repository; local HEAD matches fetched `origin/main`.
-- README explicitly distinguishes planned installers and mobile research from working functionality.
-- Run the intent artifact validator and Git whitespace checks.
-- Obtain independent read-only review of the exact bootstrap files before committing and pushing.
-- Final task response records the repository URL, commit, validation, review, and remaining work; this record does not duplicate live Git status.
+- Named unit tests prove focus loss, Escape, GUI stop, errors, and completion release all held input and prevent later actions.
+- Dry run emits no OS input. Invalid templates fail before execution. Runs are bounded; waits are interruptible.
+- Native Windows and macOS adapters check target identity, permissions/readiness, foreground focus, and Escape state without collecting credentials or recording other keys.
+- The desktop UI exposes binding, dry run, live arming, countdown, stop, and actionable errors without automatic login or automatic focus acquisition.
+- Run `python3 -m unittest discover -s tests -v`, compile checks, artifact validators, and Git whitespace checks.
+- Obtain fresh independent read-only code and UI review before closeout. Record actual host validation separately from Windows/macOS manual test gates.
+- README provides exact local run/build commands, remaining platform tests, and honest limitations. No release or platform support claim is based only on unit tests.
+- The prototype is committed and pushed; local and fetched remote main match after the final documentation update.
+- Automated Windows/macOS builds test and smoke-check packaged binaries before uploading private, revision-labeled artifacts. Verify completed runs and actual downloadable artifact records before claiming builds are ready.
 
 ## Source-of-truth links
 
 - Canonical authority: this `intent.md`.
 - Product overview and proposed roadmap: [README.md](README.md).
+- Prototype behavior: [spec.md](spec.md); execution and evidence: [plan.md](plan.md).
 - Accepted scope source: the October 19, 2026 user instruction in this chat.

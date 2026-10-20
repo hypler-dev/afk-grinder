@@ -23,6 +23,8 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.egg-info/
+.pytest_cache/
 
 # Local recordings, captures, profiles, and logs
 recordings/
