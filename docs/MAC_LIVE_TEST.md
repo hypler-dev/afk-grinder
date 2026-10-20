@@ -4,11 +4,14 @@ Authority: [intent.md](../intent.md). Test only a short supervised session; sign
 
 ## Before testing
 
+The first corrected CI build is [run 39363752157](https://github.com/hypler-dev/afk-grinder/actions/runs/39363752157), source `76c3efbfcb7e846762602577769f2760d4d4991d`. Use that build or a later build confirmed to contain the same focus correction.
+
 1. Download the appropriate Mac artifact from a successful [build run](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml). Extract both the GitHub ZIP and the app archive. Record the source commit from `BUILD_INFO.json`. Do not use Mac artifacts from `6cde71e` or `980772a` for live input: their focus detector can remain cached. Use a build containing the Mac foreground-cache correction.
-2. Verify `SHA256SUMS.txt`, then open `AFKGrinder.app`. Do not disable macOS security protections. Resolve any trust or input-permission decisions yourself through normal macOS controls.
-3. In Adopt Me, stand on clear ground, close chat and menus, and dismiss incoming trade/purchase prompts. Do not use this test for purchases or trades.
-4. In AFK Grinder, select Live input and refresh readiness. Missing Accessibility/Input Monitoring permission is a blocked test, not a pass. The app must not grant permissions itself.
-5. Click **Bind Roblox after 3 seconds**, then manually switch to Roblox during the three-second countdown. Return to AFK Grinder and confirm a Roblox target is bound. Repeat binding if Roblox restarts.
+2. Verify `SHA256SUMS.txt`, then open `AFKGrinder.app`. Do not disable macOS security protections. Resolve any trust or input-permission decisions yourself through normal macOS controls. Quit other AFK Grinder copies and open this exact artifact from Finder; multiple copies share an application identifier and can cause macOS to launch a different copy. Unsigned build changes may require refreshing the two input permissions and restarting.
+3. Before any live input, verify the running executable belongs to the extracted, checksum-verified artifact. In Terminal run `ps -axo pid=,comm= | grep '[A]FKGrinder.app/Contents/MacOS/AFKGrinder'`. Require exactly one result and compare its full path with this artifact's `AFKGrinder.app/Contents/MacOS/AFKGrinder`; stop if it points to another copy such as a local `dist` build. Confirm the adjacent `BUILD_INFO.json` source commit matches the selected successful CI run. Record that path and source with the test results.
+4. In Adopt Me, stand on clear ground, close chat and menus, and dismiss incoming trade/purchase prompts. Do not use this test for purchases or trades.
+5. In AFK Grinder, select Live input and refresh readiness. Missing Accessibility/Input Monitoring permission is a blocked test, not a pass. The app must not grant permissions itself.
+6. Click **Bind Roblox after 3 seconds**, then manually switch to Roblox during the three-second countdown. Return to AFK Grinder and confirm a Roblox target is bound. Repeat binding if Roblox restarts.
 
 ## Movement
 
