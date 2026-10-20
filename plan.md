@@ -6,6 +6,10 @@ Authority: [intent.md](intent.md)
 Owner: Jeff / hypler-dev
 Last updated: 2026-10-20
 
+## Current checkpoint
+
+Source `13fa0832b60021445a27b0d8c167e5a6ed7705f1` is the current verified launcher/scaling revision. GitHub Actions [run 39425375723](https://github.com/hypler-dev/afk-grinder/actions/runs/39425375723) passed all three Windows x64/macOS Apple Silicon/Intel jobs on the first attempt. The six application and SDK-inventory JSON artifacts were downloaded and statically verified from `/private/tmp/afk-grinder-ci-39425375723/VERIFICATION.json`. Current blocker is native capture acceptance: the staged Mac app is access-blocked and its explicit capture attempt returned `permission/preflight/capture_error`; fresh all-three-permission confirmation remains pending. Roblox is disconnected/idle; manual reconnect and clear-gameplay confirmation remain pending. Scaling source, shutdown fixes, and the final receipt are complete; gameplay, installer, and assistive-technology acceptance remain open.
+
 ## Scope and protected lanes
 
 Preserve the bounded local input prototype and develop the adopted BUILD.md roadmap incrementally. Public repository visibility/topics, the original README banner, commit/push and automated test artifacts remain authorized. Native gameplay tests remain short and supervised after manual login. Credential access, transactions, injection, signed/public GitHub release publication and mobile implementation are excluded. Longer sessions require the blueprint's endurance evidence; network pack updates require its curated signature/provenance gates.
@@ -421,3 +425,39 @@ Authority remains `intent.md`; the owner requested automatic binding and adoptio
 - Fresh independent read-only OpenAI Terra review found a P3 coverage gap in the display-bound correction. The smoke resize is now isolated for deterministic checks covering a 1180 px request capped to a 1024 px host with a 1008 px client, an unchanged request on a larger display, invalid/unavailable bounds, exact four-field numeric output and failure when the window does not reach its capped target. The layout, zoom and Stop gates are retained. All 174 tests, compilation, whitespace and plan validation pass; the actual no-input Mac source smoke also passes all three requested widths and the six-section scaling matrix. Follow-up independent review and final CI remain pending at this snapshot.
 - Fresh review passed the display-bound correction and its four regression tests; `338d9c2` and `6f29704` were committed/pushed. In run 39424469805, Windows passed the source scaling matrix. The Apple Silicon source smoke printed all three viewport measurements and the final success message, then remained alive until the one-minute step timeout. Its 1180 px request was correctly capped to a reported 1024 px display. Pending bridge callbacks attempted replies after close. Inspection of pinned pywebview 6.2.1 identifies non-daemon utility threads and an unbounded Cocoa response semaphore as a shutdown hazard; this is distinct from layout failure. Only pywebview utility workers are now daemonized. The input runner remains non-daemon and the controller close gate continues to await cleanup. A subprocess regression uses the real pinned dispatcher with permanently blocked reply delivery and requires normal process exit; no forced exit or timeout waiver is introduced. New validation, review and exact-revision CI remain pending.
 - Run 39424469805 completed with Windows and Intel successful and Apple Silicon failed on process shutdown after its source checks passed. Windows source and both frozen checks report requested/available/target/actual widths `640/1024/640/624`, `960/1024/960/944` and `1180/1024/1024/1008`; the hosted display bound and client border account for the earlier resize failure. The shutdown correction passes all 175 unit tests, compilation, whitespace and an actual Mac source smoke with normal exit. Independent review and a new exact-revision all-platform build remain required.
+
+### Final launcher scaling and receipt
+
+- Source `13fa0832b60021445a27b0d8c167e5a6ed7705f1` passed all 3 CI jobs in [run 39425375723](https://github.com/hypler-dev/afk-grinder/actions/runs/39425375723) on the first attempt. Local source validation passed 175 tests, compilation, Node/frontend checks, diff/whitespace checks, and the actual no-input native smoke. Its six-section matrix requests 640×450 at 200% and 100%, 960×700 at 100%, and 1180×800 at 100%, capping width to the available host display. The Interface menu also offers 125%, 150%, and 175%; these intermediate levels do not have full native matrix acceptance. CI source/frozen gates, packaged dry-run/readiness, and both Mac deep strict ad-hoc signature checks also passed. The downloaded artifacts and inventories were verified against `/private/tmp/afk-grinder-ci-39425375723/VERIFICATION.json`.
+- Final artifact receipt:
+
+| Target | Application archive SHA-256 | SDK inventory SHA-256 | Inventory counts (embedded / SDK modules / native / legal paths) |
+| --- | --- | --- | --- |
+| Windows x64 | `b185bfe69ae3281a8e90cbe5865b260e5544b9d89cf2fff4149af59dd97ff300` | `1fe30814028402f7ea0b421b154a710771aa89b80fe49af833273155cdbe5151` | 505 / 677 / 122 / 126 |
+| Mac Apple Silicon | `8e6d21f8b09c1bd751c00e021e65af0f705652a1ec95be499d73bcad790b9db7` | `5fc5a837cb5e82b2472e1d50c8edea0d02f60a71da4afefef29eca64fb69909a` | 391 / 558 / 109 / 248 |
+| Mac Intel | `50428059e0bfcc754f076e08151bc1e74b55c21c8adbbc248598fcc3f29d88e9` | `5afd6b773cb4bf05443375e83657239c42283c6308e5d41eec40d376592fc532` | 391 / 558 / 109 / 248 |
+
+- The application bundles are SDK-free, carry 102 verified notices, retain the expected frontend/art/architecture metadata, and pass source/archive exclusion checks. SDK-bearing outputs remain private; no SDK-bearing upload occurred. Native captures, gameplay, installer, assistive-technology, release, signing/notarization, and acceptance testing remain open; ad-hoc signatures were verified but do not close production signing/notarization. No live input was sent; no game screenshots or game pixels were saved or committed. Launcher UI screenshots were saved for UI inspection. Credentials, transactions, deployment, and public binary release did not occur.
+- Staged native receipt: `/private/tmp/afk-grinder-current/AFKGrinder.app`, executable SHA-256 `89c148599f9e460de50411edb4101914119b43c60a2974b271fb0c7890326a53`, title `0.2.0 · 13fa083`. The launcher auto-bound one Roblox target while remaining foreground; access was blocked. Explicit Capture returned `permission/preflight/capture_error` and published no pixels. Fresh all-three permission request/confirmation remains pending. Roblox is currently disconnected/idle; manual reconnect and clear-gameplay confirmation remain pending. No live input was sent.
+- Producer/integrator: Sol, OpenAI primary controller, with native diagnosis by Sol; frontend/design production by OpenAI Terra; documentation production by OpenAI Luna. Independent reviewers: OpenAI Terra-xhigh `gpt_reviewer` for `51eb15b..a59a3fe`, `a59a3fe..6f29704`, and `6f29704..13fa083`; OpenAI Terra-xhigh `gpt_ui_review` for exact range `51eb15b..a59a3fe` only. All applicable reviews passed with no remaining P1/P2/P3 findings. GLM was skipped because the registry was stale/future-dated before contact; no provider call or payload transfer occurred. No Spark lane was used.
+- Changed paths for the scaling slice (`git diff --name-only 51eb15b4a131812e235e16add5a84acc843c08c4..HEAD`):
+
+```text
+README.md
+docs/DESKTOP_BRIDGE.md
+docs/UI_DESIGN.md
+intent.md
+plan.md
+spec.md
+src/afk_grinder/capture/__init__.py
+src/afk_grinder/capture/service.py
+src/afk_grinder/desktop_app.py
+src/afk_grinder/desktop_controller.py
+src/afk_grinder/web/app.js
+src/afk_grinder/web/index.html
+src/afk_grinder/web/styles.css
+tests/test_capture_service.py
+tests/test_desktop_app.py
+tests/test_desktop_controller.py
+tests/test_frontend_contract.py
+```
