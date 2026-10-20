@@ -108,6 +108,11 @@ def frame(target=TARGET_ONE, *, captured_at=10.0, native_rect=(0, 0, 16, 9)) -> 
     )
 
 
+def completed_result(captured_frame: CapturedWindow, *, received_at=10.0,
+                     completed_at=10.0) -> JobResult:
+    return JobResult(frame=captured_frame, received_at=received_at, completed_at=completed_at)
+
+
 class DesktopControllerTests(unittest.TestCase):
     def test_recorder_starts_only_for_live_enabled_calibrated_session_and_ticket_is_scoped(self):
         for mode, enabled, calibrated in (("dry", True, True), ("live", False, True),
@@ -234,7 +239,7 @@ class DesktopControllerTests(unittest.TestCase):
 
     def capture_reference(self, controller, captured_at=10.0):
         controller.command("capture", {})
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame(captured_at=captured_at))
+        self.jobs.jobs[-1][2].result = completed_result(frame(captured_at=captured_at))
         state = controller.get_state()
         preview_id = state["preview"]["id"]
         self.assertTrue(controller.command("set_area", {
@@ -260,7 +265,7 @@ class DesktopControllerTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 controller = self.make_controller((TARGET_ONE,))
                 controller.command("capture", {})
-                self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+                self.jobs.jobs[-1][2].result = completed_result(frame())
                 target = ("afk_grinder.desktop_controller.layout_from_capture" if operation == "layout_from_capture"
                           else "afk_grinder.desktop_controller.DesktopController._encode_preview_async")
                 with patch(target, side_effect=ValueError("/private/person/window-title")):
@@ -283,7 +288,7 @@ class DesktopControllerTests(unittest.TestCase):
 
         controller = self.make_controller((TARGET_ONE,))
         controller.command("capture", {})
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         with patch("afk_grinder.desktop_controller.threading.Thread", ImmediateThread), \
              patch("afk_grinder.desktop_controller._png_data_url", side_effect=ValueError("/private/person/window")):
             controller.get_state()
@@ -301,7 +306,7 @@ class DesktopControllerTests(unittest.TestCase):
         controller = self.make_controller((TARGET_ONE,))
         preview_id = self.capture_reference(controller)
         controller.command("check_area", {"preview_id": preview_id, "attested": True})
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         self.assertEqual(controller.get_state()["preview"]["geometry"], "matched")
         self.clock.value = 10.6
         state = controller.get_state()
@@ -322,14 +327,117 @@ class DesktopControllerTests(unittest.TestCase):
         controller.command("check_area", {"preview_id": preview_id, "attested": True})
         self.assertIsNone(controller._preview_frame)
         self.assertIsNone(controller._preview_layout)
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         state = controller.get_state()
         self.assertEqual(state["preview"]["phase"], "error")
         self.assertIsNone(state["preview"]["area"])
         controller.command("capture", {})
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame(captured_at=11.0))
+        self.jobs.jobs[-1][2].result = completed_result(frame(captured_at=11.0))
         self.assertEqual(controller.get_state()["preview"]["phase"], "error")
         self.assertIsNone(controller._tracker.latest)
+
+    def test_manual_calibration_reports_each_expired_freshness_phase(self) -> None:
+        cases = (
+            ("capture_freshness", 9.49, 10.0, 10.0, 10.0),
+            ("worker_exit_freshness", 9.6, 9.6, 10.2, 10.2),
+            ("preview_freshness", 9.6, 9.6, 9.7, 10.2),
+        )
+        for stage, captured_at, received_at, completed_at, now in cases:
+            with self.subTest(stage=stage):
+                controller = self.make_controller((TARGET_ONE,))
+                preview_id = self.capture_reference(controller)
+                self.assertTrue(controller.command("check_area", {
+                    "preview_id": preview_id, "attested": True,
+                })["ok"])
+                self.clock.value = now
+                self.jobs.jobs[-1][2].result = completed_result(
+                    frame(captured_at=captured_at), received_at=received_at,
+                    completed_at=completed_at,
+                )
+                preview = controller.get_state()["preview"]
+                self.assertEqual(preview["phase"], "error")
+                self.assertEqual(preview["error"]["code"], "stale")
+                self.assertEqual(preview["error"]["stage"], stage)
+                self.assertIsNone(controller._content_calibration)
+                self.assertIsNone(controller._tracker.latest)
+
+    def test_manual_calibration_accepts_exact_half_second_boundary(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        preview_id = self.capture_reference(controller)
+        self.assertTrue(controller.command("check_area", {
+            "preview_id": preview_id, "attested": True,
+        })["ok"])
+        self.jobs.jobs[-1][2].result = completed_result(
+            frame(captured_at=9.5), received_at=9.5, completed_at=10.0,
+        )
+        state = controller.get_state()
+        self.assertEqual(state["preview"]["phase"], "available")
+        self.assertEqual(state["preview"]["geometry"], "matched")
+
+    def test_manual_calibration_missing_invalid_and_future_timing_fail_closed(self) -> None:
+        cases = (
+            JobResult(frame=frame(captured_at=9.0)),
+            completed_result(frame(captured_at=9.0), received_at=float("nan"), completed_at=10.0),
+            completed_result(frame(captured_at=9.0), received_at=True, completed_at=10.0),
+            completed_result(frame(captured_at=9.0), received_at=10 ** 1000, completed_at=10.0),
+            completed_result(frame(captured_at=9.0), received_at=10.0, completed_at=9.5),
+            completed_result(frame(captured_at=9.0), received_at=11.0, completed_at=11.0),
+            completed_result(frame(captured_at=11.0), received_at=11.0, completed_at=11.0),
+        )
+        for result in cases:
+            with self.subTest(result=result):
+                controller = self.make_controller((TARGET_ONE,))
+                preview_id = self.capture_reference(controller)
+                self.assertTrue(controller.command("check_area", {
+                    "preview_id": preview_id, "attested": True,
+                })["ok"])
+                self.jobs.jobs[-1][2].result = result
+                preview = controller.get_state()["preview"]
+                self.assertEqual(preview["phase"], "error")
+                self.assertEqual(preview["error"]["code"], "stale")
+                self.assertEqual(preview["error"]["stage"], "preview_freshness")
+                self.assertIsNone(controller._content_calibration)
+
+    def test_manual_calibration_layout_mismatch_stays_preview_geometry(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        preview_id = self.capture_reference(controller)
+        self.assertTrue(controller.command("check_area", {
+            "preview_id": preview_id, "attested": True,
+        })["ok"])
+        self.jobs.jobs[-1][2].result = completed_result(
+            frame(native_rect=(0, 0, 15, 9), captured_at=9.0),
+            received_at=10.0, completed_at=10.0,
+        )
+        preview = controller.get_state()["preview"]
+        self.assertEqual(preview["phase"], "error")
+        self.assertEqual(preview["error"]["code"], "geometry")
+        self.assertEqual(preview["error"]["stage"], "preview_geometry")
+        self.assertIsNone(controller._content_calibration)
+
+    def test_optional_timing_metadata_never_replaces_capture_freshness(self) -> None:
+        for metadata in ({}, {"received_at": float("nan"), "completed_at": 11.0}):
+            with self.subTest(metadata=metadata):
+                controller = self.make_controller((TARGET_ONE,))
+                preview_id = self.capture_reference(controller)
+                self.assertTrue(controller.command("check_area", {
+                    "preview_id": preview_id, "attested": True,
+                })["ok"])
+                self.jobs.jobs[-1][2].result = JobResult(frame=frame(), **metadata)
+                preview = controller.get_state()["preview"]
+                self.assertEqual(preview["phase"], "available")
+                self.assertEqual(preview["geometry"], "matched")
+                self.assertNotIn("received_at", repr(controller.get_state()))
+                self.assertNotIn("completed_at", repr(controller.get_state()))
+
+    def test_nonfinite_controller_clock_rejects_plain_preview(self) -> None:
+        controller = self.make_controller((TARGET_ONE,))
+        controller.command("capture", {})
+        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.clock.value = float("nan")
+        preview = controller.get_state()["preview"]
+        self.assertEqual(preview["phase"], "error")
+        self.assertEqual(preview["error"]["stage"], "preview_freshness")
+        self.assertIsNone(controller._preview_frame)
 
     def test_native_scan_failure_stops_live_but_does_not_cancel_dry_run(self) -> None:
         for mode in ("dry", "live"):
@@ -491,7 +599,7 @@ class DesktopControllerTests(unittest.TestCase):
     def test_capture_result_has_no_pixels_in_state_and_safe_diagnostics(self) -> None:
         controller = self.make_controller((TARGET_ONE,))
         self.assertTrue(controller.command("capture", {})["ok"])
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         state = controller.get_state()
         self.assertEqual(state["preview"]["phase"], "available")
         self.assertNotIn("pixels", repr(state))
@@ -508,14 +616,14 @@ class DesktopControllerTests(unittest.TestCase):
         self.assertTrue(controller.command("capture", {})["ok"])
         self.backend.targets = (TARGET_TWO,)
         self.refresh(controller)
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame(TARGET_ONE))
+        self.jobs.jobs[-1][2].result = completed_result(frame(TARGET_ONE))
         state = controller.get_state()
         self.assertEqual(state["preview"]["phase"], "error")
 
     def test_arbitrary_aspect_requires_attestation_and_fresh_exact_layout(self) -> None:
         controller = self.make_controller((TARGET_ONE,))
         self.assertTrue(controller.command("capture", {})["ok"])
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         state = controller.get_state()
         preview_id = state["preview"]["id"]
         self.assertFalse(controller.command("set_area", {
@@ -526,7 +634,7 @@ class DesktopControllerTests(unittest.TestCase):
         })["ok"])
         self.assertFalse(controller.command("check_area", {"preview_id": preview_id, "attested": False})["ok"])
         self.assertTrue(controller.command("check_area", {"preview_id": preview_id, "attested": True})["ok"])
-        self.jobs.jobs[-1][2].result = JobResult(frame=frame())
+        self.jobs.jobs[-1][2].result = completed_result(frame())
         self.assertEqual(controller.get_state()["preview"]["geometry"], "matched")
 
     def test_runner_events_consume_ack_and_close_is_nonblocking(self) -> None:

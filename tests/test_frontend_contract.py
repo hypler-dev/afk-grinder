@@ -31,16 +31,20 @@ class FrontendContractTests(unittest.TestCase):
         formatter = re.search(r'  function captureDiagnostic\(error\) [^\n]+', SOURCE).group(0)
         inputs = [{'code': 'unexpected', 'stage': stage, 'error_type': 'runtime_error'}
                   for stage in ('ipc_read', 'worker_exit', 'worker_deadline',
-                                'preview_geometry', 'preview_encoding')]
+                                'capture_freshness', 'worker_exit_freshness',
+                                'preview_freshness', 'preview_geometry', 'preview_encoding')]
+        inputs.append({'code': 'stale', 'stage': 'preview_freshness', 'error_type': 'value_error'})
         inputs += [{'code': 'unexpected', 'stage': '/private/user/window-title', 'error_type': 'runtime_error'},
                    {'code': '/private/user/window-title', 'stage': 'worker', 'error_type': 'runtime_error'}]
         script = declarations + '\n' + formatter + '\nconsole.log(JSON.stringify(' + json.dumps(inputs) + '.map(captureDiagnostic)));'
         result = subprocess.run(['node', '-e', script], capture_output=True, text=True,
                                 timeout=5, check=True)
         messages = json.loads(result.stdout)
-        for value, message in zip(inputs[:5], messages[:5]):
+        for value, message in zip(inputs[:8], messages[:8]):
             self.assertIn('at ' + value['stage'], message)
-        self.assertEqual(messages[5:], ['Preview failed. No input was sent.'] * 2)
+        self.assertIn('Capture a new preview', messages[8])
+        self.assertNotRegex(messages[8], r'\d')
+        self.assertEqual(messages[9:], ['Preview failed. No input was sent.'] * 2)
         self.assertNotIn('/private', result.stdout)
 
 

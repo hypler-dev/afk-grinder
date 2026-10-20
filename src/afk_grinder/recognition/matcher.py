@@ -282,6 +282,12 @@ class LabelMatcher:
         self._tasker: Any = None
         self._closed = False
 
+    def warmup(self) -> None:
+        """Load the fixed read-only OCR resources before accepting a frame."""
+        if self._closed:
+            raise SDKError("Recognition matcher is closed.")
+        self._ensure_initialized()
+
     def match_labels(self, width: int, height: int, pixels: bytes, *, timeout: float = 2.0) -> tuple[LabelHit, ...]:
         """Recognize one in-memory BGR frame and return known label metadata only."""
         _validate_frame(width, height, pixels)

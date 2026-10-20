@@ -28,6 +28,7 @@ CAPTURE_DIAGNOSTIC_CODES = frozenset({
     "timeout",
     "conversion",
     "unavailable",
+    "stale",
     "unexpected",
 })
 CAPTURE_DIAGNOSTIC_STAGES = frozenset({
@@ -44,6 +45,9 @@ CAPTURE_DIAGNOSTIC_STAGES = frozenset({
     "ipc_read",
     "worker_exit",
     "worker_deadline",
+    "capture_freshness",
+    "worker_exit_freshness",
+    "preview_freshness",
     "preview_geometry",
     "preview_encoding",
 })

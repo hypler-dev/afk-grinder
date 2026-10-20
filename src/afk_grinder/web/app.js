@@ -9,8 +9,8 @@
   ];
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
-  const CAPTURE_CODES = new Set(['permission', 'window_count', 'window_missing', 'geometry', 'black_frame', 'timeout', 'conversion', 'unavailable', 'unexpected']);
-  const CAPTURE_STAGES = new Set(['initialization', 'preflight', 'discovery', 'window_selection', 'filter_geometry', 'display_selection', 'screenshot', 'pixel_conversion', 'frame_validation', 'worker', 'ipc_read', 'worker_exit', 'worker_deadline', 'preview_geometry', 'preview_encoding']);
+  const CAPTURE_CODES = new Set(['permission', 'window_count', 'window_missing', 'geometry', 'black_frame', 'timeout', 'conversion', 'unavailable', 'stale', 'unexpected']);
+  const CAPTURE_STAGES = new Set(['initialization', 'preflight', 'discovery', 'window_selection', 'filter_geometry', 'display_selection', 'screenshot', 'pixel_conversion', 'frame_validation', 'worker', 'ipc_read', 'worker_exit', 'worker_deadline', 'capture_freshness', 'worker_exit_freshness', 'preview_freshness', 'preview_geometry', 'preview_encoding']);
   const CAPTURE_ERROR_TYPES = new Set(['capture_error', 'attribute_error', 'type_error', 'value_error', 'runtime_error', 'timeout_error', 'unexpected']);
   const MIB = 1024 * 1024;
   const model = { state: null, route: 'library', bridgeReady: false, polling: false, previewRequestId: 0, previewGameId: null, image: null, imageId: null, draftArea: null, pendingArea: null, pointer: null, areaAttested: false, gamesKey: '', candidatesKey: '', roiDrawId: 0, roiObserver: null, replayFrameId: null, replayImage: null, replayImageId: null, replayRequestGeneration: 0, replayPlaying: false, replayTimer: null, replayRows: new Map(), pendingDeleteId: null, replayAutoFrameKey: null, recordingDraft: null, recordingDirty: false, recordingPending: null };
@@ -19,7 +19,7 @@
   function say(message) { $('#announcer').textContent = message || ''; }
   function showError(message) { const node = $('#error-message'); node.textContent = message || 'Desktop action failed.'; node.hidden = false; window.setTimeout(() => { node.hidden = true; }, 5000); }
   function errorText(error) { return error && typeof error.message === 'string' ? error.message : 'Desktop action failed.'; }
-  function captureDiagnostic(error) { if (!error || typeof error !== 'object' || !CAPTURE_CODES.has(error.code) || !CAPTURE_STAGES.has(error.stage) || !CAPTURE_ERROR_TYPES.has(error.error_type)) return 'Preview failed. No input was sent.'; const reason = error.code === 'permission' ? 'Capture permission is missing for this build. On macOS, enable Screen Recording in Privacy & Security, then reopen the app.' : 'Preview failed.'; return `${reason} Diagnostic: ${error.code} at ${error.stage} (${error.error_type}). No input was sent.`; }
+  function captureDiagnostic(error) { if (!error || typeof error !== 'object' || !CAPTURE_CODES.has(error.code) || !CAPTURE_STAGES.has(error.stage) || !CAPTURE_ERROR_TYPES.has(error.error_type)) return 'Preview failed. No input was sent.'; const reason = error.code === 'permission' ? 'Capture permission is missing for this build. On macOS, enable Screen Recording in Privacy & Security, then reopen the app.' : error.code === 'stale' ? 'Preview expired before calibration. Capture a new preview and try again.' : 'Preview failed.'; return `${reason} Diagnostic: ${error.code} at ${error.stage} (${error.error_type}). No input was sent.`; }
   function sessionIdle(state) { return state && state.session && ['idle', 'stopped', 'completed', 'error'].includes(state.session.phase); }
   function supported(state) { const game = currentGame(state); return Boolean(game && game.supported); }
   function currentGame(state) { return state && Array.isArray(state.games) ? state.games.find((game) => game.id === state.game_id) : null; }

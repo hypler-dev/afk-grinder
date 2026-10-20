@@ -21,7 +21,7 @@ from dataclasses import asdict
 from afk_grinder.replay import ReplaySettings
 from afk_grinder.session_recorder import SessionRecorder
 
-from afk_grinder.capture import CaptureDiagnostic, CapturedWindow, capture_error_type
+from afk_grinder.capture import CaptureDiagnostic, CaptureError, CapturedWindow, capture_error_type
 from afk_grinder.capture.service import BackgroundJob, JobResult
 from afk_grinder.engine import Runner
 from afk_grinder.models import Target, Workflow
@@ -82,9 +82,35 @@ def _safe_diagnostic(diagnostic: CaptureDiagnostic | None) -> dict[str, str]:
         "message": (
             "Capture permission is missing for this build. On macOS, enable Screen Recording "
             "in Privacy & Security, then reopen this app. No input was sent."
-            if diagnostic.code == "permission" else "Preview failed. No input was sent."
+            if diagnostic.code == "permission" else
+            "Preview expired before calibration. Capture a new preview and try again. No input was sent."
+            if diagnostic.code == "stale" else "Preview failed. No input was sent."
         ),
     }
+
+
+def _valid_monotonic(value: Any) -> bool:
+    try:
+        return type(value) in (int, float) and math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
+
+
+def _capture_freshness(frame: CapturedWindow, result: JobResult, now: float) -> CaptureDiagnostic | None:
+    """Locate expiry in valid parent timing; never authorize an observation."""
+    received_at, completed_at = result.received_at, result.completed_at
+    fallback = CaptureDiagnostic(code="stale", stage="preview_freshness", error_type="value_error")
+    if not all(_valid_monotonic(value) for value in (received_at, completed_at, now)):
+        return fallback
+    if not frame.captured_at <= received_at <= completed_at <= now:
+        return fallback
+    if received_at - frame.captured_at > 0.5:
+        return CaptureDiagnostic(code="stale", stage="capture_freshness", error_type="value_error")
+    if completed_at - frame.captured_at > 0.5:
+        return CaptureDiagnostic(code="stale", stage="worker_exit_freshness", error_type="value_error")
+    if now - frame.captured_at > 0.5:
+        return fallback
+    return None
 
 
 class DesktopController:
@@ -948,13 +974,23 @@ class DesktopController:
             layout = layout_from_capture(result.frame)
             if layout.target != context.target:
                 raise ValueError("Target changed.")
-            now = self._clock()
-            if not math.isfinite(now) or result.frame.captured_at > now:
-                raise ValueError("Observation timestamp is invalid.")
-            fresh = now - result.frame.captured_at <= 0.5
             if context.area is not None:
                 if layout != context.source_layout:
-                    raise ValueError("Layout changed.")
+                    raise CaptureError("Layout changed.", code="geometry", stage="preview_geometry")
+            now = self._clock()
+            valid_timestamp = _valid_monotonic(now) and result.frame.captured_at <= now
+            fresh = valid_timestamp and now - result.frame.captured_at <= 0.5
+            if not valid_timestamp or (context.area is not None and not fresh):
+                self._preview_phase = "error"
+                self._preview_error = _safe_diagnostic(_capture_freshness(result.frame, result, now) or CaptureDiagnostic(
+                    code="stale", stage="preview_freshness", error_type="value_error",
+                ))
+                self._preview_frame = None
+                self._preview_layout = None
+                self._preview_png = None
+                self._clear_geometry_locked()
+                return job
+            if context.area is not None:
                 viewport = tuple(int(value) for value in (context.area.x, context.area.y,
                                                           context.area.width, context.area.height))
                 calibration = ContentCalibration.manual(layout, viewport)
@@ -980,7 +1016,7 @@ class DesktopController:
             self._encode_preview_async(self._preview_id, result.frame)
         except Exception as error:
             self._preview_phase = "error"
-            self._preview_error = _safe_diagnostic(CaptureDiagnostic(
+            self._preview_error = _safe_diagnostic(error.diagnostic if isinstance(error, CaptureError) else CaptureDiagnostic(
                 code="unexpected", stage=stage, error_type=capture_error_type(error),
             ))
             self._preview_frame = None

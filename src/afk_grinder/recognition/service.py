@@ -113,6 +113,7 @@ def _worker(connection: Connection, model_directory: Path, labels: dict[str, str
             return
         try:
             matcher = matcher_factory(model_directory, labels)
+            matcher.warmup()
             _send(connection, {"kind": "ready"})
         except Exception:
             _send(connection, {"kind": "error", "error": WARMUP_ERROR})

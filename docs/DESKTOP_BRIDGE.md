@@ -50,6 +50,8 @@ After an allowlisted response, verification requires two fresh negative observat
 
 Parent-side capture failures distinguish `ipc_read`, `worker_exit` and `worker_deadline`, retaining only allowlisted codes and exception categories. A child frame is never accepted when native teardown exits unsuccessfully or exceeds its deadline. Launcher preparation reports `preview_geometry` or `preview_encoding`; encoding failure clears retained pixels, layout and calibration rather than leaving a usable preview state.
 
+An expired manual-calibration capture reports code `stale` at `capture_freshness` (already expired at IPC receipt), `worker_exit_freshness` (expired by successful native teardown), or `preview_freshness` (expired only by controller consumption, or detailed timing unavailable). The parent records the two intermediate timestamps locally; neither timestamp nor numerical timing is exported or persisted. The 0.5-second bound and source capture timestamp remain unchanged. An exact-layout mismatch instead reports `geometry` at `preview_geometry`; all failures clear calibration and authorize no input.
+
 ## Commands
 
 All names and payload keys are allowlisted. Unknown or malformed input is rejected before mutation. Mutations that conflict with active input or cleanup are rejected. Stop is always available and has priority over ordinary mutations.

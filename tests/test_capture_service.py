@@ -53,11 +53,38 @@ class CaptureServiceTests(unittest.TestCase):
         job._thread.join(timeout=1)
         result = job.poll()
         self.assertEqual(result.report, {"native_input": False})
+        self.assertIsNotNone(result.received_at)
+        self.assertIsNotNone(result.completed_at)
+        self.assertGreaterEqual(result.completed_at, result.received_at)
         self.assertIsNone(job.poll())
         self.assertTrue(job.done)
         process.join.assert_called_once()
         self.assertTrue(reader.closed)
         self.assertTrue(writer.closed)
+
+    def test_parent_timestamps_bracket_receipt_and_successful_teardown(self):
+        context, _, _, process = self.context([])
+        clock = [10.0]
+        frame = CapturedWindow(TARGET, "99", (0, 0, 2, 1), (2, 1), "screen", (1, 1),
+                               b"\x01\x02\x03" * 2, "BGR8", 10.0)
+
+        def receive(*_):
+            clock[0] = 10.2
+            return JobResult(frame=frame)
+
+        def finish(**_):
+            clock[0] = 10.4
+
+        process.join.side_effect = finish
+        with patch("afk_grinder.capture.service.time.monotonic", side_effect=lambda: clock[0]), \
+             patch("afk_grinder.capture.service._read_result", side_effect=receive):
+            job = BackgroundJob("capture", TARGET, _context=context)
+            job._thread.join(timeout=1)
+            result = job.poll()
+        self.assertIs(result.frame, frame)
+        self.assertEqual(result.received_at, 10.2)
+        self.assertEqual(result.completed_at, 10.4)
+        self.assertEqual(result.frame.captured_at, 10.0)
 
     def test_cancel_drops_already_queued_and_late_frame_results(self):
         context, _, _, _ = self.context([b'{"kind":"sdk","report":{"native_input":false}}'])
@@ -157,7 +184,10 @@ class CaptureServiceTests(unittest.TestCase):
         result = _read_result(Pipe(pipe.sent), "capture", TARGET)
         self.assertEqual(result.frame, frame)
         self.assertEqual(len(pipe.sent), 2)
-        self.assertNotIn("pixels", json.loads(pipe.sent[0]))
+        header = json.loads(pipe.sent[0])
+        self.assertNotIn("pixels", header)
+        self.assertNotIn("received_at", header)
+        self.assertNotIn("completed_at", header)
         self.assertLessEqual(len(pipe.sent[1]), MAX_FRAME_BYTES)
         self.assertTrue(pipe.closed)
 

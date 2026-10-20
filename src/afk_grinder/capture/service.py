@@ -4,7 +4,7 @@ The UI polls a queue. Native calls, pipe reads and process teardown never run
 on Tk's event thread. Messages contain JSON and BGR bytes, not pickled results.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import math
 import multiprocessing
@@ -27,10 +27,18 @@ GENERIC_WORKER_ERROR_MESSAGE = "Preview or SDK check failed. No input was sent."
 
 @dataclass(frozen=True)
 class JobResult:
+    """One parent-owned job result.
+
+    Timing samples are taken only by the parent after IPC read and successful
+    child teardown. They are never child IPC fields or exported UI state.
+    """
+
     frame: CapturedWindow | None = None
     report: dict[str, Any] | None = None
     error: str = ""
     diagnostic: CaptureDiagnostic | None = None
+    received_at: float | None = None
+    completed_at: float | None = None
 
 
 def _worker(connection: Connection, operation: str, target: Target | None,
@@ -211,6 +219,7 @@ class BackgroundJob:
         stage = "ipc_read"
         try:
             result = _read_result(self._reader, operation, target)
+            received_at = time.monotonic()
             stage = "worker_exit"
             # Do not publish success until native destructors have exited too.
             self._process.join(timeout=max(0, self._deadline - time.monotonic()))
@@ -218,6 +227,7 @@ class BackgroundJob:
                 raise TimeoutError("Observation process did not finish before its deadline.")
             if self._process.exitcode != 0:
                 raise RuntimeError("Observation process exited unsuccessfully.")
+            result = replace(result, received_at=received_at, completed_at=time.monotonic())
         except Exception as error:
             result = JobResult(error="Preview or SDK check failed. No input was sent.",
                                diagnostic=CaptureDiagnostic(

@@ -205,6 +205,14 @@ class MatcherSdkBoundaryTests(unittest.TestCase):
 
 
 class LabelMatcherTests(unittest.TestCase):
+    def test_closed_label_matcher_cannot_warm_native_resources(self):
+        instance = matcher.LabelMatcher(Path.cwd(), {"bank": "bank"})
+        instance.close()
+        with patch.object(instance, "_ensure_initialized") as initialize:
+            with self.assertRaises(matcher.SDKError):
+                instance.warmup()
+        initialize.assert_not_called()
+
     def test_label_configuration_and_metadata_are_bounded(self):
         with self.assertRaises(ValueError):
             matcher.LabelMatcher(Path.cwd(), {"not valid": "trade"})
@@ -249,7 +257,8 @@ class LabelMatcherTests(unittest.TestCase):
              patch.object(matcher.importlib.metadata, "version", return_value="5.14.3"), \
              patch.object(matcher.importlib.util, "find_spec", return_value=object()), \
              patch.object(matcher.importlib, "import_module", side_effect=modules.__getitem__):
-            instance._ensure_initialized()
+            instance.warmup()
+            instance.warmup()
 
         resource.post_ocr_model.assert_called_once_with(Path.cwd())
         tasker_type.set_save_draw.assert_called_once_with(False)

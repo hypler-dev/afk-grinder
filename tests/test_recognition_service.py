@@ -53,9 +53,15 @@ class FakeMatcher:
         self.labels = labels
         self.closed = False
         self.frames = []
+        self.warmups = 0
         type(self).instances.append(self)
 
+    def warmup(self):
+        self.warmups += 1
+
     def match_labels(self, width, height, pixels, *, timeout):
+        if self.warmups != 1:
+            raise AssertionError("Model must load before accepting frames.")
         self.frames.append((width, height, pixels, timeout))
         if type(self).error is not None:
             raise type(self).error
@@ -219,6 +225,48 @@ class RecognitionWorkerTests(unittest.TestCase):
             "hits": [{"label_id": "bank", "score": 0.9, "box": [1, 2, 3, 4]}],
         })
         self.assertEqual(FakeMatcher.instances[0].frames, [(8, 8, bytes(8 * 8 * 3), 1.0)])
+        self.assertEqual(FakeMatcher.instances[0].warmups, 1)
+        self.assertTrue(FakeMatcher.instances[0].closed)
+        self.assertTrue(pipe.closed)
+
+    def test_ready_is_withheld_until_model_initialization_finishes(self):
+        entered, release = threading.Event(), threading.Event()
+
+        class BlockingMatcher(FakeMatcher):
+            def warmup(self):
+                entered.set()
+                if not release.wait(1):
+                    raise RuntimeError("Test warmup was not released.")
+                super().warmup()
+
+        pipe = Pipe()
+        gate = threading.Event()
+        gate.set()
+        thread = threading.Thread(target=_worker, args=(pipe, Path("/model"), LABELS, gate, BlockingMatcher))
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            self.assertEqual(pipe.sent, [])
+        finally:
+            release.set()
+            thread.join(1)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(json.loads(pipe.sent[0]), {"kind": "ready"})
+        self.assertTrue(FakeMatcher.instances[0].closed)
+
+    def test_model_initialization_failure_never_announces_ready(self):
+        class BrokenMatcher(FakeMatcher):
+            def warmup(self):
+                raise RuntimeError("SENSITIVE_MODEL_MARKER /private/model")
+
+        pipe = Pipe()
+        gate = threading.Event()
+        gate.set()
+        _worker(pipe, Path("/model"), LABELS, gate, BrokenMatcher)
+        self.assertEqual(len(pipe.sent), 1)
+        self.assertEqual(json.loads(pipe.sent[0]), {"kind": "error", "error": WARMUP_ERROR})
+        self.assertNotIn("SENSITIVE_", pipe.sent[0].decode())
+        self.assertNotIn("/private/", pipe.sent[0].decode())
         self.assertTrue(FakeMatcher.instances[0].closed)
         self.assertTrue(pipe.closed)
 
