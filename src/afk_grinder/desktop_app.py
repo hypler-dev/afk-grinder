@@ -160,7 +160,15 @@ def open_desktop(*, smoke: bool = False) -> None:
     failed = threading.Event()
     rejected = threading.Event()
     closed = threading.Event()
+    closing_requested = threading.Event()
+    lifecycle_lock = threading.Lock()
     close_worker_started = threading.Event()
+
+    def request_close() -> None:
+        with lifecycle_lock:
+            closing_requested.set()
+            api._allowed.clear()
+        window.destroy()
 
     def fail(stage: str, error: Exception | None = None) -> None:
         first = not failed.is_set()
@@ -185,35 +193,44 @@ def open_desktop(*, smoke: bool = False) -> None:
             controller.close()
             # Public destroy waits for the shown event, which has not fired
             # during before_show. Close on a worker once startup can proceed.
-            threading.Thread(target=window.destroy, daemon=True).start()
+            threading.Thread(target=request_close, daemon=True).start()
 
     def before_load() -> None:
         api._allowed.clear()
 
     def loaded() -> None:
+        if closing_requested.is_set():
+            return
         try:
             # Edge's cached Source can describe an initialization or canceled
             # navigation. Verify the document that is actually executing.
             current_url = window.evaluate_js("window.location.href")
-            if guard and allowed_document(current_url, url) and not failed.is_set():
-                api._allowed.set()
-            else:
+            with lifecycle_lock:
+                if closing_requested.is_set():
+                    return
+                trusted = guard and allowed_document(current_url, url) and not failed.is_set()
+                if trusted:
+                    api._allowed.set()
+            if not trusted:
                 reason = _document_failure(current_url, url) if guard else "missing_guard"
                 fail(reason + ("_after_bridge" if api._observed.is_set() else "_startup"))
-                window.destroy()
+                request_close()
         except Exception as error:
-            fail("loaded_callback", error)
-            window.destroy()
+            if not closing_requested.is_set():
+                fail("loaded_callback", error)
+                request_close()
 
     def finish_close() -> None:
         while not closed.is_set():
             if controller.close():
-                window.destroy()
+                request_close()
                 return
             time.sleep(0.02)
 
     def closing() -> bool:
-        api._allowed.clear()
+        with lifecycle_lock:
+            closing_requested.set()
+            api._allowed.clear()
         if controller.close():
             return True
         if not close_worker_started.is_set():
@@ -229,21 +246,28 @@ def open_desktop(*, smoke: bool = False) -> None:
 
     def smoke_check() -> None:
         from .capture.service import BackgroundJob
-        job = BackgroundJob("sdk")
+        job = None
         deadline = time.monotonic() + 18
         result = None
         stage = "bridge_startup"
         try:
             while time.monotonic() < deadline and not closed.is_set() and not failed.is_set():
-                result = job.poll() if result is None else result
-                if result is not None and api._observed.is_set():
+                if api._observed.is_set():
                     if window.evaluate_js("document.documentElement.dataset.bridgeReady === 'true'"):
                         break
                 time.sleep(0.05)
             else:
                 raise RuntimeError("Launcher bridge startup timed out.")
-            missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
             stage = "sdk_service"
+            # Keep native WebView startup separate from the SDK's own hard
+            # 15-second process deadline, especially on cold Intel runners.
+            job = BackgroundJob("sdk", timeout=min(15.0, max(0.1, deadline - time.monotonic())))
+            while result is None and not closed.is_set() and not failed.is_set():
+                result = job.poll()
+                time.sleep(0.05)
+            if result is None:
+                raise RuntimeError("Launcher closed during the SDK service check.")
+            missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
             if not missing_sdk and (result.error or result.report is None):
                 raise RuntimeError("Spawned recognition service failed.")
             stage = "ui_state"
@@ -258,9 +282,10 @@ def open_desktop(*, smoke: bool = False) -> None:
         except Exception as error:
             fail(stage, error)
         finally:
-            job.cancel()
+            if job is not None:
+                job.cancel()
             controller.close()
-            window.destroy()
+            request_close()
 
     try:
         webview.start(smoke_check if smoke else None,

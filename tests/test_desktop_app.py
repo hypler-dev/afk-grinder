@@ -1,8 +1,11 @@
 """Trusted-shell API boundaries with no WebView or native backend."""
 
+import threading
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
-from afk_grinder.desktop_app import DesktopAPI, _document_failure, allowed_document, restricted_dispatch
+from afk_grinder.desktop_app import DesktopAPI, _document_failure, allowed_document, open_desktop, restricted_dispatch
 
 
 class FakeController:
@@ -21,6 +24,59 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_close_during_loaded_callback_does_not_fail_or_reopen_bridge(self):
+        class Event:
+            def __init__(self):
+                self.handlers = []
+
+            def __iadd__(self, handler):
+                self.handlers.append(handler)
+                return self
+
+        events = SimpleNamespace(**{name: Event() for name in
+                                    ("before_show", "before_load", "loaded", "closing", "closed")})
+        evaluating, release = threading.Event(), threading.Event()
+        window = Mock(events=events)
+        controller = Mock()
+        controller.close.return_value = True
+        api_holder = []
+
+        def create_window(*args, **kwargs):
+            api_holder.append(kwargs['js_api'])
+            return window
+
+        def evaluate(*args):
+            evaluating.set()
+            self.assertTrue(release.wait(1))
+            return None  # WebView disposal can finish an outstanding query.
+
+        window.evaluate_js.side_effect = evaluate
+
+        def start(*args, **kwargs):
+            events.before_show.handlers[0]()
+            loaded = threading.Thread(target=events.loaded.handlers[0])
+            loaded.start()
+            try:
+                self.assertTrue(evaluating.wait(1))
+                self.assertTrue(events.closing.handlers[0]())
+            finally:
+                release.set()
+                loaded.join(timeout=1)
+            self.assertFalse(loaded.is_alive())
+            events.loaded.handlers[0]()  # Late duplicate callbacks are ignored.
+
+        webview = SimpleNamespace(settings={}, create_window=create_window, start=start)
+        with patch.dict('sys.modules', {'webview': webview}), \
+             patch('afk_grinder.desktop_app.sys.platform', 'darwin'), \
+             patch('afk_grinder.desktop_app._restrict_bridge'), \
+             patch('afk_grinder.desktop_app._install_navigation_guard', return_value=object()), \
+             patch('afk_grinder.desktop_app.DesktopController', return_value=controller), \
+             patch('afk_grinder.backends.create_backend', return_value=None):
+            open_desktop()
+        self.assertFalse(api_holder[0]._allowed.is_set())
+        window.evaluate_js.assert_called_once()
+        window.destroy.assert_not_called()
+
     def test_entry_failure_diagnostics_expose_no_native_url(self):
         expected = "file:///trusted/web/index.html"
         self.assertEqual(_document_failure(None, expected), "blank_document")

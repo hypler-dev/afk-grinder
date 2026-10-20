@@ -90,6 +90,38 @@ class CaptureServiceTests(unittest.TestCase):
         self.assertTrue(job._results.empty())
         self.assertIsNone(job.poll())
 
+    def test_cancel_and_read_teardown_close_reader_once(self):
+        context, reader, _, _ = self.context([])
+        reading, release_read = threading.Event(), threading.Event()
+        closing, release_close = threading.Event(), threading.Event()
+        close_calls = []
+
+        def delayed_result(*args):
+            reading.set()
+            self.assertTrue(release_read.wait(1))
+            return JobResult(report={"native_input": False})
+
+        def delayed_close():
+            close_calls.append(True)
+            closing.set()
+            self.assertTrue(release_close.wait(1))
+            reader.closed = True
+
+        reader.close = delayed_close
+        with patch("afk_grinder.capture.service._read_result", side_effect=delayed_result):
+            job = BackgroundJob("sdk", _context=context)
+            try:
+                self.assertTrue(reading.wait(1))
+                job.cancel()
+                self.assertTrue(closing.wait(1))
+                release_read.set()
+            finally:
+                release_close.set()
+                job._thread.join(timeout=1)
+        self.assertFalse(job._thread.is_alive())
+        self.assertEqual(len(close_calls), 1)
+        self.assertIsNone(job.poll())
+
     def test_outer_deadline_never_publishes_success_after_timeout(self):
         context, _, _, _ = self.context([b'{"kind":"sdk","report":{"native_input":false}}'])
         job = BackgroundJob("sdk", _context=context)

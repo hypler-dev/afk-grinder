@@ -147,6 +147,7 @@ class BackgroundJob:
         self._cancelled = threading.Event()
         self._result_lock = threading.Lock()
         self._cleanup_lock = threading.Lock()
+        self._reader_close_lock = threading.Lock()
         self._results: queue.Queue[JobResult] = queue.Queue(maxsize=1)
         context = _context or multiprocessing.get_context("spawn")
         reader, writer = context.Pipe(duplex=False)
@@ -162,7 +163,7 @@ class BackgroundJob:
         try:
             self._process.start()
         except Exception:
-            self._reader.close()
+            self._close_reader()
             self._publish(JobResult(error="Could not start preview or SDK check. No input was sent."))
         else:
             writer.close()
@@ -182,6 +183,13 @@ class BackgroundJob:
         with self._result_lock:
             return self._finished
 
+    def _close_reader(self) -> None:
+        # Connection.close is not thread-safe. Cancellation and normal read
+        # teardown must not close the same descriptor concurrently.
+        with self._reader_close_lock:
+            if not self._reader.closed:
+                self._reader.close()
+
     def _publish(self, result: JobResult) -> None:
         with self._result_lock:
             if not self._cancelled.is_set():
@@ -199,7 +207,7 @@ class BackgroundJob:
         except Exception:
             result = JobResult(error="Preview or SDK check failed. No input was sent.")
         finally:
-            self._reader.close()
+            self._close_reader()
             if self._process.is_alive():
                 self._terminate()
         self._publish(result)
@@ -246,4 +254,4 @@ class BackgroundJob:
                     self._process.kill()
                     self._process.join(timeout=0.2)
             finally:
-                self._reader.close()
+                self._close_reader()
