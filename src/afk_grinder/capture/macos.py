@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib
 import sys
-import ctypes
 from math import isfinite
 from time import monotonic
 from typing import Any
@@ -219,22 +218,24 @@ class MacOSCapture:
         context = self._Quartz.CGBitmapContextCreate(None, width, height, 8, width * 4, color_space, bitmap_info)
         if context is None:
             raise CaptureError("macOS could not create a BGR8 capture conversion context.")
+        # PyObjC owns the CGContext reference. Calling CGContextRelease here
+        # releases it twice when the bridge later destroys its Python proxy.
+        self._Quartz.CGContextDrawImage(context, self._Quartz.CGRectMake(0, 0, width, height), image)
+        address = self._Quartz.CGBitmapContextGetData(context)
+        as_buffer = getattr(address, "as_buffer", None)
+        if not callable(as_buffer):
+            raise CaptureError("macOS BGR8 capture conversion returned no readable pixel data.")
+        byte_count = width * height * 4
         try:
-            self._Quartz.CGContextDrawImage(context, self._Quartz.CGRectMake(0, 0, width, height), image)
-            address = self._Quartz.CGBitmapContextGetData(context)
-            if not address:
-                raise CaptureError("macOS BGR8 capture conversion returned no pixel data.")
-            byte_count = width * height * 4
-            try:
-                raw = ctypes.string_at(address, byte_count)
-            except (TypeError, ValueError):
-                # PyObjC releases expose this pointer as a buffer-like varlist.
-                raw = bytes(memoryview(address)[:byte_count])
-            if len(raw) != byte_count:
-                raise CaptureError("macOS BGR8 capture conversion returned a short pixel buffer.")
-            return width, height, bgrx_to_bgr(raw, width * height)
-        finally:
-            self._Quartz.CGContextRelease(context)
+            # A Quartz void pointer is an objc.varlist, not a ctypes address or
+            # Python buffer. Copy its documented, allocation-bounded view while
+            # the owning context is still alive.
+            raw = bytes(as_buffer(byte_count))
+        except (TypeError, ValueError, BufferError) as error:
+            raise CaptureError("macOS BGR8 capture conversion could not read its pixel buffer.") from error
+        if len(raw) != byte_count:
+            raise CaptureError("macOS BGR8 capture conversion returned a short pixel buffer.")
+        return width, height, bgrx_to_bgr(raw, width * height)
 
     @staticmethod
     def _expected_pixels(binding: WindowBinding) -> tuple[int, int]:

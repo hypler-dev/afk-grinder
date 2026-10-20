@@ -286,3 +286,17 @@ No unrelated working-tree changes observed. Generated `.venv/`, `build/`, `dist/
 - A separate test assumed an Event timeout and the monotonic parent deadline expired on the same clock tick. The child still received no native-work grant; the test now expires the parent deadline explicitly before asserting its result, removing that timing assumption without changing runtime gates.
 - Producer: `gpt_worker` (OpenAI Terra high) for pack code/tests, GPT/Sol for diagnosis and the timer assertion. Fresh independent `gpt_reviewer` (OpenAI Terra xhigh) PASS, no P1/P2/P3. Pack tests: 16 PASS; capture-service tests: 12 PASS; full source suite before the separate M1 bridge: 112 PASS. A new Windows/Mac run is required before this correction is accepted across platforms.
 - The separate M1 capture-to-geometry bridge and M0 SDK-inventory work remain outside this corrective commit. No native game input, capture permission change, production release, or deploy occurred.
+
+### Windows correction verification and Mac preview diagnosis
+
+- Correction `0fd7d29d08f6098e8f3d85ec3e29625f74b23d66` passed all three jobs in [run 39402685675](https://github.com/hypler-dev/afk-grinder/actions/runs/39402685675), including private SDK/source checks, frozen startup, fake GUI checks and SDK-free packaging. Downloaded Windows x64 (`12256591102`), Mac arm64 (`12256231280`) and Mac x64 (`12255686646`) artifacts. Outer hashes, exact embedded/external source metadata, architecture, Mac executable modes, all 95 retained notice hashes and the SDK-exclusion guard pass. Mac arm64 deep strict ad-hoc signature verification passes. These are CI test binaries; native gameplay remains unverified.
+
+```text
+a1a3aac5956878db402058e238a6c7df22e94689176f47da78d45090be4f142f  AFKGrinder-windows-x64.zip
+e5aa3bc15c360df9b95483688af8195459ed89f36d3288ab326b61fc166c8869  AFKGrinder-macos-arm64.tar.gz
+c192416a7f65034a65d93a1dbdad94b5cc174f7b5c9c862c4142edf8bf21a613  AFKGrinder-macos-x64.tar.gz
+```
+
+- The owner authorized Screen Recording for the verified `8a2da0d` Mac arm64 test app and completed administrator authentication manually. System Settings showed the grant enabled. Its restart selected a different local bundle with the same identifier; that copy was closed, and the exact CI executable path was verified before testing. The owner manually bound Roblox successfully. Capture then failed with the generic error and no visible preview. This is not a capture pass, and no game input was sent.
+- Sol reproduced two native conversion defects using synthetic 2×2 images without ScreenCaptureKit or screen access: `CGBitmapContextGetData` returns an `objc.varlist`, which rejects the ctypes/buffer fallback; explicitly releasing its PyObjC-owned context causes a later garbage-collection crash (exit 139). The repair copies its bounded [`as_buffer`](https://pyobjc.readthedocs.io/en/latest/api/module-objc.html#objc.varlist.as_buffer) view while the context is alive and leaves [reference management](https://pyobjc.readthedocs.io/en/latest/core/intro.html#reference-counting) to PyObjC. A subprocess regression requires exact red/blue BGR output and clean exit after 40 conversions and forced garbage collection. This repair passes locally; its real window-capture acceptance remains open.
+- A discarded mixed source/frozen multiprocessing diagnostic failed in interpreter bootstrap before capture. It is not evidence about the ScreenCaptureKit backend. No game pixels were saved or included in diagnostics, reviews or repository contents.
