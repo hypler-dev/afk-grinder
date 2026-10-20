@@ -20,6 +20,7 @@ target/
 dist/
 build/
 artifact-output/
+build-evidence/
 __pycache__/
 *.py[cod]
 .venv/

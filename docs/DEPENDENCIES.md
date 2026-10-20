@@ -51,3 +51,7 @@ Before distributing SDK-bearing applications:
 5. Review final source/artifact contents and record evidence before removing the packaging block.
 
 Source development and private diagnostic builds can proceed while this gate remains open. This inventory does not certify complete compliance, game compatibility, performance minima or production-release readiness.
+
+`python -m tools.inventory_build --label TARGET --commit COMMIT --output build-evidence/sdk-inventory.json --require-sdk` reads an existing private diagnostic bundle without importing or executing its SDK. Its `sdk-inventory.v2` JSON records embedded modules, native files (including extensionless framework executables), internal path aliases, executable hashes and legal-file hashes. Paths are bundle-relative. A supplied target label and commit are provenance inputs, not independent operating-system or clean-source verification. Local output from a dirty checkout is diagnostic evidence only; exact-revision CI receipts establish the source association.
+
+CI records this JSON before rebuilding the SDK-free download. The separate JSON artifact contains no SDK binaries or screen images. Successful inventory does not close corresponding-source, replacement, attribution or final artifact-review gates, and does not authorize removal of the SDK publication block.
