@@ -316,17 +316,25 @@ def open_desktop(*, smoke: bool = False) -> None:
             stage = "ui_state"
             if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
                 raise RuntimeError("Inactive cleanup warning is visible.")
+            stage = "interface_screen"
+            screen_width = window.evaluate_js("window.screen.availWidth")
+            if type(screen_width) not in (int, float) or not 620 <= screen_width <= 32768:
+                raise RuntimeError("Native interface screen bounds are unavailable.")
             for width, height, levels in ((640, 450, (200, 100)), (960, 700, (100,)), (1180, 800, (100,))):
                 stage = f"interface_resize_{width}"
-                window.resize(width, height)
+                target_width = min(width, int(screen_width))
+                window.resize(target_width, height)
                 resize_deadline = time.monotonic() + 2
                 while time.monotonic() < resize_deadline:
                     original_width = window.evaluate_js("window.innerWidth")
-                    if isinstance(original_width, (int, float)) and abs(original_width - width) <= 40:
+                    if isinstance(original_width, (int, float)) and abs(original_width - target_width) <= 40:
                         break
                     time.sleep(0.05)
                 else:
                     raise RuntimeError("Native interface resize failed.")
+                if sys.stdout is not None:
+                    print(f"Launcher smoke viewport: requested={width} available={int(screen_width)} "
+                          f"target={target_width} actual={original_width}.", flush=True)
                 for percent in levels:
                     stage = f"interface_scale_{width}_{percent}"
                     _schedule_interface_scale(window, percent, closing_requested)
