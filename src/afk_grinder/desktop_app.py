@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import sys
 import threading
 import time
@@ -103,7 +104,7 @@ def _install_navigation_guard(window: Any, expected: str, rejected: Any) -> Any:
                         handler(1)  # WKNavigationActionPolicyAllow
                     else:
                         handler(0)  # WKNavigationActionPolicyCancel
-                        self._afk_rejected()
+                        self._afk_rejected(url)
 
             _mac_delegate_class = AFKLocalNavigationDelegate
         delegate = _mac_delegate_class.alloc().init()
@@ -116,7 +117,7 @@ def _install_navigation_guard(window: Any, expected: str, rejected: Any) -> Any:
         def on_navigation(_sender: Any, event: Any) -> None:
             if not allowed_document(str(event.Uri), expected):
                 event.Cancel = True
-                rejected()
+                rejected(str(event.Uri))
 
         native.NavigationStarting += on_navigation
         return on_navigation
@@ -168,10 +169,13 @@ def open_desktop(*, smoke: bool = False) -> None:
             kind = capture_error_type(error) if error is not None else "none"
             print(f"Launcher smoke failure: {stage} ({kind}).", file=sys.stderr, flush=True)
 
-    def reject_navigation() -> None:
+    def reject_navigation(rejected_url: str) -> None:
         api._allowed.clear()
         controller.command("stop", {})
         rejected.set()
+        if smoke and sys.stderr is not None:
+            print(f"Launcher smoke navigation rejected: {_document_failure(rejected_url, url)}.",
+                  file=sys.stderr, flush=True)
 
     def before_show() -> None:
         try:
@@ -188,11 +192,14 @@ def open_desktop(*, smoke: bool = False) -> None:
 
     def loaded() -> None:
         try:
-            current_url = window.get_current_url()
+            # Edge's cached Source can describe an initialization or canceled
+            # navigation. Verify the document that is actually executing.
+            current_url = window.evaluate_js("window.location.href")
             if guard and allowed_document(current_url, url) and not failed.is_set():
                 api._allowed.set()
             else:
-                fail(_document_failure(current_url, url) if guard else "missing_guard")
+                reason = _document_failure(current_url, url) if guard else "missing_guard"
+                fail(reason + ("_after_bridge" if api._observed.is_set() else "_startup"))
                 window.destroy()
         except Exception as error:
             fail("loaded_callback", error)
@@ -244,8 +251,9 @@ def open_desktop(*, smoke: bool = False) -> None:
                 raise RuntimeError("Inactive cleanup warning is visible.")
             stage = "blocked_navigation"
             rejected.clear()
-            window.run_js("window.location.href = 'about:blank';")
-            if not rejected.wait(2) or not allowed_document(window.get_current_url(), url):
+            blocked_url = entry.with_name("styles.css").resolve().as_uri()
+            window.run_js("window.location.href = " + json.dumps(blocked_url) + ";")
+            if not rejected.wait(2) or not allowed_document(window.evaluate_js("window.location.href"), url):
                 raise RuntimeError("Native navigation guard failed.")
         except Exception as error:
             fail(stage, error)
