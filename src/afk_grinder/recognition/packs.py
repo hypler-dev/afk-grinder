@@ -298,7 +298,7 @@ def _open_beneath_root(root: _Root, relative: str) -> int:
     """
     parts = PurePosixPath(relative).parts
     no_follow = getattr(os, "O_NOFOLLOW", 0)
-    read_only = os.O_RDONLY | no_follow
+    read_only = os.O_RDONLY | no_follow | getattr(os, "O_BINARY", 0)
     if not root.descriptor_pinned:
         _assert_ancestors(root.path, root.path.joinpath(*parts).parent)
         return os.open(root.path.joinpath(*parts), read_only)
@@ -779,7 +779,9 @@ def _scan_path_tree(root: _Root, directory: Path, prefix: str, allowed_directori
             for entry in scan:
                 _count_tree_entry(entries)
                 relative = f"{prefix}/{entry.name}" if prefix else entry.name
-                info = entry.stat(follow_symlinks=False)
+                # Windows DirEntry.stat() can expose cached zero dev/inode/link
+                # metadata.  A fresh path stat is required before link policy.
+                info = os.stat(entry.path, follow_symlinks=False)
                 if stat.S_ISLNK(info.st_mode):
                     raise PackError("symlinks are forbidden in packs")
                 if stat.S_ISDIR(info.st_mode):

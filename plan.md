@@ -278,3 +278,11 @@ tools/smoke_recognition_ui.py
 ```
 
 No unrelated working-tree changes observed. Generated `.venv/`, `build/`, `dist/`, and prior downloaded test artifacts remain outside the source slice. No login automation, account-data transfer, native game input, Screen Recording permission grant, diagnostic screenshot file, signing credential, deploy, or public binary release occurred.
+
+### Windows compatibility correction after the preview slice
+
+- The reviewed preview/pack/launcher slice was committed and pushed as `8a2da0dbf356ad11a014f34c78023a9e0ca706d5`. [Run 39401623984](https://github.com/hypler-dev/afk-grinder/actions/runs/39401623984) passed both Mac targets, including the new spawned SDK-service and fake-preview checks. Mac artifact IDs: arm64 `12253719903`, x64 `12255600111`. Windows stopped in unit tests and produced no artifact; the full run failed.
+- Sol diagnosed two Windows pack-reader defects against the failed job and Python's documented Windows behavior: cached [DirEntry.stat()](https://docs.python.org/3.12/library/os.html#os.DirEntry.stat) returns zero link metadata, and CRT text-mode [os.open](https://docs.python.org/3.12/library/os.html#os.open) changes PNG CRLF/`0x1A` bytes. Fresh no-follow `os.stat()` and `O_BINARY` preserve strict link checks and exact binary bytes. Forced-fallback regressions cover valid packs, genuine hardlink rejection and binary payload preservation.
+- A separate test assumed an Event timeout and the monotonic parent deadline expired on the same clock tick. The child still received no native-work grant; the test now expires the parent deadline explicitly before asserting its result, removing that timing assumption without changing runtime gates.
+- Producer: `gpt_worker` (OpenAI Terra high) for pack code/tests, GPT/Sol for diagnosis and the timer assertion. Fresh independent `gpt_reviewer` (OpenAI Terra xhigh) PASS, no P1/P2/P3. Pack tests: 16 PASS; capture-service tests: 12 PASS; full source suite before the separate M1 bridge: 112 PASS. A new Windows/Mac run is required before this correction is accepted across platforms.
+- The separate M1 capture-to-geometry bridge and M0 SDK-inventory work remain outside this corrective commit. No native game input, capture permission change, production release, or deploy occurred.

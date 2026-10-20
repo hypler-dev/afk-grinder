@@ -9,6 +9,7 @@ import struct
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 import zlib
 
 from afk_grinder.recognition import packs
@@ -23,6 +24,37 @@ def png(width: int = 1, height: int = 1, raw: bytes | None = None) -> bytes:
     header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     raw = b"".join(b"\0" + b"\0\0\0" * width for _ in range(height)) if raw is None else raw
     return b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", header) + png_chunk(b"IDAT", zlib.compress(raw)) + png_chunk(b"IEND", b"")
+
+
+class CachedZeroEntry:
+    """Model Windows cached DirEntry metadata while retaining its real path."""
+
+    def __init__(self, entry):
+        self._entry = entry
+        self.name = entry.name
+        self.path = entry.path
+
+    def stat(self, *, follow_symlinks=True):
+        real = self._entry.stat(follow_symlinks=follow_symlinks)
+        return SimpleNamespace(st_mode=real.st_mode, st_nlink=0, st_dev=0, st_ino=0)
+
+
+class CachedZeroScandir:
+    def __init__(self, original, path):
+        self._scan = original(path)
+
+    def __enter__(self):
+        self._scan.__enter__()
+        return self
+
+    def __exit__(self, *arguments):
+        return self._scan.__exit__(*arguments)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return CachedZeroEntry(next(self._scan))
 
 
 def manifest(*, assets=None, anchors=None, states=None, routines=None, **changes):
@@ -159,6 +191,38 @@ class PackLoaderTests(unittest.TestCase):
 
             with patch.object(packs, "_parse_manifest", side_effect=swap_then_parse), self.assertRaises(PackError):
                 load_pack(root)
+
+    def test_path_fallback_uses_fresh_windows_metadata_and_rejects_hardlinks(self):
+        original_scandir = packs.os.scandir
+
+        def cached_zero_scandir(path):
+            return CachedZeroScandir(original_scandir, path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_pack(root)
+            with patch.object(packs.os, "supports_dir_fd", set()), patch.object(packs.os, "scandir", side_effect=cached_zero_scandir):
+                self.assertEqual(load_pack(root).id, "adopt-me.skeleton")
+            (root / "LICENSE").write_bytes(b"MIT")
+            (root / "LICENSE.txt").hardlink_to(root / "LICENSE")
+            with patch.object(packs.os, "supports_dir_fd", set()), patch.object(packs.os, "scandir", side_effect=cached_zero_scandir), self.assertRaises(PackError):
+                load_pack(root)
+
+    def test_fallback_binary_read_preserves_crlf_and_substitute_byte(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root_path = Path(directory)
+            payload = b"first\r\nsecond\x1athird\r\n"
+            (root_path / "payload.bin").write_bytes(payload)
+            with patch.object(packs.os, "supports_dir_fd", set()):
+                root = packs._open_root(root_path, None)
+                try:
+                    self.assertEqual(packs._read_regular(root, "payload.bin", 100), payload)
+                finally:
+                    root.close()
+            root = packs._Root(root_path, (root_path.stat().st_dev, root_path.stat().st_ino), None)
+            with patch.object(packs.os, "O_BINARY", 0x8000, create=True), patch.object(packs.os, "open", return_value=99) as open_file:
+                packs._open_beneath_root(root, "payload.bin")
+            self.assertTrue(open_file.call_args.args[1] & 0x8000)
 
     def test_tree_breadth_depth_and_unlisted_empty_directories_fail(self):
         with tempfile.TemporaryDirectory() as directory:

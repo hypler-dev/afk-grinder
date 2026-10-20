@@ -198,6 +198,9 @@ class CaptureServiceTests(unittest.TestCase):
                 child_threads[0].join(timeout=1)
                 self.assertFalse(child_threads[0].is_alive())
                 self.assertTrue(child_pipe.closed)
+                # Event timeout wakeups and monotonic clock ticks need not
+                # coincide. Test the parent's deadline independently.
+                job._deadline = time.monotonic() - 1
                 self.assertIn("timed out", job.poll().error)
             finally:
                 release.set()
