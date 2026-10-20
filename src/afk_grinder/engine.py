@@ -34,15 +34,19 @@ class Runner:
         self._held_buttons: set[str] = set()
         self.cleanup_failed = False
         self._deadline = 0.0
+        self._start_cancel: threading.Event | None = None
 
     @property
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
     def start(self, workflow: Workflow, *, target: Target | None = None,
-              dry_run: bool = True, armed: bool = False) -> None:
+              dry_run: bool = True, armed: bool = False,
+              cancel_event: threading.Event | None = None) -> None:
         validate_workflow(workflow)
         with self._lock:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Start was canceled.")
             if self.running:
                 raise RuntimeError("A run is already active.")
             if not dry_run:
@@ -55,6 +59,9 @@ class Runner:
                 problems = self.backend.readiness()
                 if problems:
                     raise RuntimeError("; ".join(problems))
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Start was canceled.")
+            self._start_cancel = cancel_event
             self._cancel.clear()
             self._thread = threading.Thread(target=self._run,
                                             args=(workflow, target, dry_run),
@@ -72,7 +79,7 @@ class Runner:
             thread.join(timeout)
 
     def _guard(self, target: Target | None, dry_run: bool, *, focus: bool) -> None:
-        if self._cancel.is_set():
+        if self._cancel.is_set() or (self._start_cancel is not None and self._start_cancel.is_set()):
             raise _Stopped("Stopped by user.")
         if time.monotonic() >= self._deadline:
             raise _Stopped("Run time limit reached.")

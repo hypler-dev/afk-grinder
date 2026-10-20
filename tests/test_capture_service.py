@@ -129,6 +129,47 @@ class CaptureServiceTests(unittest.TestCase):
         result = _read_result(Pipe([b'{"kind":"error","error":"Screen Recording permission is required"}']), "capture", TARGET)
         self.assertIn("Screen Recording", result.error)
         self.assertIsNone(result.frame)
+        self.assertIsNone(result.diagnostic)
+
+    def test_failure_diagnostic_survives_memory_only_ipc(self):
+        result = _read_result(Pipe([
+            b'{"kind":"error","error":"Screen Recording permission is required",'
+            b'"diagnostic":{"code":"permission","stage":"preflight","error_type":"capture_error"}}'
+        ]), "capture", TARGET)
+
+        self.assertEqual(result.error, "Screen Recording permission is required")
+        self.assertEqual(result.diagnostic.code, "permission")
+        self.assertEqual(result.diagnostic.stage, "preflight")
+        self.assertEqual(result.diagnostic.error_type, "capture_error")
+
+    def test_malformed_capture_diagnostics_are_rejected(self):
+        headers = (
+            b'{"kind":"error","error":"failed","diagnostic":{"code":"other","stage":"preflight","error_type":"capture_error"}}',
+            b'{"kind":"error","error":"failed","diagnostic":{"code":"permission","stage":"other","error_type":"capture_error"}}',
+            b'{"kind":"error","error":"failed","diagnostic":{"code":"permission","stage":"preflight","error_type":"other"}}',
+            b'{"kind":"error","error":"failed","diagnostic":{"code":"permission","stage":"preflight","error_type":"capture_error","detail":"private"}}',
+        )
+        for header in headers:
+            with self.subTest(header=header), self.assertRaisesRegex(ValueError, "diagnostic"):
+                _read_result(Pipe([header]), "capture", TARGET)
+
+    def test_unexpected_worker_error_exports_only_allowlisted_diagnostic(self):
+        pipe = Pipe()
+        backend = Mock()
+        backend.snapshot.side_effect = AttributeError("/private/user/window title")
+        with patch("afk_grinder.capture.service.sys.platform", "darwin"), \
+             patch("afk_grinder.capture.macos.MacOSCapture", return_value=backend):
+            gate = threading.Event()
+            gate.set()
+            _worker(pipe, "capture", TARGET, gate, time.monotonic() + 1)
+
+        header = json.loads(pipe.sent[0])
+        self.assertEqual(header["diagnostic"], {
+            "code": "unexpected", "stage": "worker", "error_type": "attribute_error",
+        })
+        self.assertNotIn("private", json.dumps(header["diagnostic"]))
+        result = _read_result(Pipe(pipe.sent), "capture", TARGET)
+        self.assertEqual(result.diagnostic.error_type, "attribute_error")
 
     def test_error_or_hung_teardown_never_returns_success(self):
         context, _, _, process = self.context([b'{"kind":"sdk","report":{"native_input":false}}'])

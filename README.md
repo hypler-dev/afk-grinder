@@ -6,9 +6,9 @@
 
 A free, MIT-licensed Windows/macOS application in development for local Roblox automation, starting with Adopt Me. The implemented baseline is still a supervised input prototype; [BUILD.md](BUILD.md) defines the recognition and care-routine roadmap.
 
-**Current state:** prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. Automated builds provide Windows x64 and macOS Apple Silicon/Intel test bundles. The bundled template tests movement controls; it does not complete Adopt Me tasks. Live Roblox compatibility, representative player hardware, and production installers are not yet validated.
+**Current state:** a native dark game-library launcher with automatic Roblox discovery, deterministic keyboard/mouse playback, cancellation, and emergency-stop checks. The workflow targets Windows x64 and macOS Apple Silicon/Intel. Earlier verified artifacts use Tk; exact-revision launcher artifacts are pending the next successful run. The bundled template tests movement controls; it does not complete Adopt Me tasks. Live Roblox compatibility, representative player hardware, and production installers are not yet validated.
 
-**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. The input path does not capture screenshots. A separate opt-in Recognition Setup preview foundation keeps window frames in memory; native capture and game recognition acceptance remain pending.
+**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. The input path does not capture screenshots. The optional Setup preview keeps selected-window frames in memory; native capture and game recognition acceptance remain pending.
 
 ## License and use at your own risk
 
@@ -22,17 +22,17 @@ I built this for my kids because I wanted them to go outside. This is a fun fami
 
 This is an experimental family project. The current prototype is for short, supervised input tests; unattended gameplay is not ready yet.
 
-## Game library design
+## Game library
 
-The [interactive launcher design](docs/design/index.html) uses a dark violet/cyan theme, original preview artwork, and separate game cards for Adopt Me, Bee Swarm Simulator, and Blox Fruits. Adopt Me is the first input-check profile; the other cards are proposed profiles labelled **Not supported yet**. Switching games clears setup and live arming. The design runs offline and sends no game input.
+The native launcher adopts the [accepted interactive design](docs/design/index.html): a dark violet/cyan theme, original preview artwork, and separate game cards for Adopt Me, Bee Swarm Simulator, and Blox Fruits. Adopt Me is the first input-check profile; the other cards are proposed profiles labelled **Not supported yet**. Switching games clears setup and live arming. The native shell uses bundled files and system WebViews; it opens no HTTP server and loads no remote resources. The separate design reference remains simulated.
 
 ![Dark launcher design with original preview cards for Adopt Me, Bee Swarm Simulator, and Blox Fruits. This is a simulated design, not the native application.](docs/design/library-dark.jpg)
 
-This is a visual prototype, separate from the current Python/Tk test binaries. [UI direction and state rules](docs/UI_DESIGN.md) describe the native integration boundary and support gates.
+The application now uses this direction through a local pywebview interface backed by the existing guarded Python engine. [UI state rules](docs/UI_DESIGN.md) and the [local bridge contract](docs/DESKTOP_BRIDGE.md) describe the boundary. Settings shows the version, source commit and platform so older copies can be distinguished. The earlier Tk interface remains available with `--legacy-ui`.
 
 ## Run from source
 
-Use Python 3.11+ with Tk installed. Confirm Tk is available with `python -m tkinter` before installation. On macOS, use a Python distribution with working Tk; on Windows, include Tcl/Tk when installing Python.
+Use Python 3.11+ on Windows or macOS. The native launcher uses macOS WebKit or the [Microsoft WebView2 Runtime](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution) on Windows. It does not download a browser automatically. Tk is needed only for the legacy troubleshooting interface and its GUI regression tests; include Tcl/Tk in your Python installation when using those.
 
 From the project directory on either target OS:
 
@@ -59,7 +59,7 @@ python -m pip install -e .
 python -m afk_grinder
 ```
 
-Alternatively, with uv and a Python installation containing Tk, use `uv sync --locked` and `uv run --locked python -m afk_grinder`. The committed `uv.lock` pins dependencies; plain pip installs use the declared compatible version ranges.
+Alternatively, with uv, use `uv sync --locked` and `uv run --locked python -m afk_grinder`. The committed `uv.lock` pins dependencies; plain pip installs use the declared compatible version ranges.
 
 Two command-line checks send no native input:
 
@@ -81,15 +81,15 @@ This checks MaaFw 5.14.3 with synthetic pixels only, CPU configuration, privacy 
 
 CI is configured to verify SDK loading in source and frozen applications on all three desktop targets, then rebuild the downloadable prototype without the optional SDK. SDK-bearing artifact publication remains blocked until its source/notice distribution audit is complete. [Dependency evidence](docs/DEPENDENCIES.md) tracks this work.
 
-In the source application, **Tools → Recognition setup** opens the no-input preview surface. Select the Roblox window explicitly, then request a single preview. macOS capture requires macOS 14+ and Screen Recording permission for the application identity; access is never requested silently. Mac window content bounds are currently labelled unverified. Preview and SDK checks never enable care routines or bypass input safeguards. Cancel or close the modal to discard its snapshot before returning to input controls.
+Open **Setup** to see automatic Roblox discovery, access status and the optional window preview. One verified running player binds automatically; multiple players require a choice. No foreground-switch countdown is needed for binding, and binding sends no input. Capture requires an explicit click. macOS capture requires macOS 14+ and Screen Recording permission for the exact application identity; access is never requested silently. Raw Mac window bounds remain unverified. Preview errors display bounded reason/stage/type codes. Capture and reference geometry never enable care routines or bypass input safeguards.
 
 ## First supervised test
 
-1. Launch the app in its default **Dry run** mode. Validate the workflow and run it; no OS input is sent.
+1. Open **Session** in the default **Dry run** mode. Run the input check; no OS input is sent.
 2. Sign into Roblox manually, enter the game, close chat/menus, and position the character away from sensitive interactions. Keep the game visible.
 3. Select **Live input**. Refresh readiness and resolve any reported permissions. On macOS, Accessibility and Input Monitoring permission must be enabled for the relevant Python/application identity in System Settings; restart the app after permission changes if needed. The app does not request or grant permissions silently.
-4. Click **Bind Roblox after 3 seconds** and switch manually to Roblox during the three-second countdown. The binding pins the process, and its window handle on Windows. Return to the prototype to inspect the binding.
-5. Review the short JSON sequence. Confirm manual login/gameplay readiness, click Start, and switch to the bound Roblox window during the three-second countdown.
+4. Open **Setup**. A single verified Roblox player binds automatically without changing focus. If multiple players appear, choose one. Retry discovery if the game starts later.
+5. Review the short routine; its optional JSON editor is under **Routines**. Confirm manual login/gameplay readiness, click Start in **Session**, and switch to the bound Roblox window during the three-second countdown.
 6. Press **Escape** to stop live execution. Clicking Stop or closing the prototype also cancels. Switching away from the bound target during playback stops the run; it never resumes automatically.
 
 The default template holds W for 250 ms, waits 500 ms, and holds S for 250 ms. It is an input test, not a route or AFK grind routine. It has not been proven to work inside Roblox. Each live run consumes its acknowledgment; review the scene again before another run.
@@ -98,7 +98,7 @@ For the bounded movement, focus-loss, and physical Escape checks, follow [the su
 
 ## Edit actions
 
-Edit workflow JSON in the app. Copy the JSON to a local file to save it; the prototype has no recorder or import/export controls yet. Templates are data, not executable code:
+Edit workflow JSON under **Routines → Advanced template**. Copy the JSON to a local file to save it; the prototype has no recorder or import/export controls yet. Templates are data, not executable code:
 
 ```json
 {
@@ -155,7 +155,7 @@ Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/action
 
 GitHub wraps each artifact in a download ZIP. Extract it, then extract the application archive inside. Keep the Windows executable beside its runtime files. The Mac archive preserves app-bundle symlinks and executable permissions. Each artifact includes `SHA256SUMS.txt` and `BUILD_INFO.json` identifying the exact source revision and architecture. Artifacts expire after 14 days; use **Run workflow** to rebuild when needed.
 
-The workflow runs for app/build changes pushed to `main` and pull requests targeting `main`, plus manual dispatch. Each target runs safety/packaging tests, fake-input UI smoke, a native build, and packaged dry-run/readiness checks before uploading. macOS permission denial is expected on fresh runners; missing native modules or other startup errors fail the build. No Roblox session or game input runs in CI.
+The workflow runs for app/build changes pushed to `main` and pull requests targeting `main`, plus manual dispatch. Each target is configured to require safety/packaging tests, fake-input legacy UI checks, real launcher bridge/navigation smoke, a native build, and packaged dry-run/readiness checks before uploading. This describes required gates; it does not establish a successful new-launcher run. macOS permission denial is expected on fresh runners; missing native modules or other startup errors fail the build. No Roblox session or game input runs in CI.
 
 These are unsigned prototype bundles, not production installers or gameplay certification. OS signing/trust warnings may appear. This project does not disable OS protections or change permissions automatically. Live testing still requires your own manual Roblox sign-in and explicit input permissions.
 
@@ -166,7 +166,7 @@ python -m unittest discover -s tests -v
 python -m compileall -q src tests tools
 ```
 
-On a desktop session, `python tools/smoke_ui.py` also exercises UI gates, binding cancellation, close/Quit cleanup, and minimum-window control visibility using a fake backend. It opens test windows but sends no OS keyboard/mouse input. Assistive-technology support remains unverified; the current Tk macOS accessibility tree does not expose the form controls reliably.
+On a desktop session, `python -m afk_grinder --ui-smoke` loads the actual launcher with its input backend disabled, checks the three-method bridge, blocks test navigation and runs a synthetic SDK worker. It sends no game input or screen capture. `python tools/smoke_ui.py` also exercises the legacy Tk UI gates, binding cancellation, close/Quit cleanup, and minimum-window control visibility using a fake backend. It opens test windows but sends no OS keyboard/mouse input. The new launcher exposes semantic controls and status announcements; formal assistive-technology acceptance remains unverified. The legacy Tk macOS tree does not expose its form controls reliably.
 
 Unit tests use fake adapters and send no OS input. Before claiming support, test both target systems with a user-controlled game session: denied/granted permissions, wrong target, target closing, focus loss while holding a key/button, Escape during countdown/hold/wait, GUI Stop, window close, cleanup failure, and actual Roblox response. Run the same checks on packaged builds. Intel/Apple Silicon macOS builds and Windows architectures need separate evidence.
 
@@ -174,12 +174,12 @@ Unit tests use fake adapters and send no OS input. Before claiming support, test
 
 | Platform | Scope |
 | --- | --- |
-| Windows | x64 CI build/startup checks pass; supervised Roblox testing and installer pending |
-| macOS | Apple Silicon/Intel CI build/startup checks pass; supervised Roblox testing and signed distribution pending |
+| Windows | Earlier Tk x64 CI passed; new launcher CI, supervised Roblox testing and installer pending |
+| macOS | Earlier Tk CI passed on both Macs; new launcher passes local Apple Silicon startup; exact-revision CI, live input and signed distribution pending |
 | Linux | Excluded; [Roblox does not officially support it](https://en.help.roblox.com/hc/en-us/articles/203312800-Computer-Hardware-Operating-System-Requirements) |
 | iOS / Android | Feasibility research only; no implementation commitment |
 
-After desktop input proof: recorder and visual editor, guided Adopt Me calibration, visual checkpoints, tested task routines, then installers and signed releases. Research mobile input/capture restrictions, permissions, distribution rules, privacy, and stop controls separately. A shared framework alone does not establish mobile automation feasibility.
+Next gates follow BUILD.md: verified window capture and guided Adopt Me calibration, visual checkpoints, guarded care routines, then longer-session evidence and production distribution. Recording and a visual action editor are not prerequisites. Research mobile input/capture restrictions, permissions, distribution rules, privacy, and stop controls separately. A shared framework alone does not establish mobile automation feasibility.
 
 Roblox prohibits cheating/exploits and disruptive automation; permission for this particular use in Adopt Me has not been established. See [Roblox Community Standards](https://en.help.roblox.com/hc/en-us/articles/203313410-Roblox-Community-Standards) and [Adopt Me support](https://www.playadopt.me/support). Client injection, memory access, anti-cheat bypass, automated purchases, and trades remain excluded.
 

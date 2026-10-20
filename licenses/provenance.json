@@ -475,6 +475,43 @@
       "file": "MaaDeps-zlib-copyright.txt",
       "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
       "source": "MaaDeps v3.0.0 MaaDeps-arm64-osx.tar.xz sha256 407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67: share/zlib/copyright"
+    },
+    {
+      "file": "pywebview-6.2.1.txt",
+      "sha256": "4a988dd3598832cd3653de20dc33cb677d0fb53ab5551c879ca31280ae653675",
+      "source": "Official PyPI pywebview 6.2.1 installed locked wheel pywebview-6.2.1.dist-info/licenses/LICENSE; https://pypi.org/project/pywebview/6.2.1/"
+    },
+    {
+      "file": "Bottle-0.13.4.txt",
+      "sha256": "af150257b1f7cce92b6207854f2e8f90ea9ae52d7cac758d13a47bd12e2a2443",
+      "source": "Official PyPI bottle 0.13.4 installed locked wheel bottle-0.13.4.dist-info/licenses/LICENSE; https://pypi.org/project/bottle/0.13.4/"
+    },
+    {
+      "file": "typing_extensions-4.16.0.txt",
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+      "source": "Official PyPI typing_extensions 4.16.0 installed locked wheel typing_extensions-4.16.0.dist-info/licenses/LICENSE; https://pypi.org/project/typing_extensions/4.16.0/"
+    },
+    {
+      "file": "proxy_tools-0.1.0-BSD.txt",
+      "sha256": "a428fb8a2e762af3eb0a6edbbb88e9b42ccfee80fd9b423958bcacf9b9abbfe4",
+      "source": "https://github.com/jtushman/proxy_tools/blob/ccd35a569b95bec271a59890780c7821756c548a/LICENSE.txt; version 0.1.0 source header identifies BSD despite MIT package metadata"
+    },
+    {
+      "file": "WebView2-1.0.3856.49-LICENSE.txt",
+      "sha256": "9995174528dba139ca753d02d8667dbec49f65ab17e65c643a914f2b58cfb4a2",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3856.49/microsoft.web.webview2.1.0.3856.49.nupkg: LICENSE.txt",
+      "upstream_sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+      "normalization": "Trailing whitespace removed; copyright and license wording unchanged."
+    },
+    {
+      "file": "WebView2-1.0.3856.49-NOTICE.txt",
+      "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3856.49/microsoft.web.webview2.1.0.3856.49.nupkg: NOTICE.txt"
+    },
+    {
+      "file": "CFFI-2.1.1-Windows-libffi-notices.txt",
+      "sha256": "771bd1500429004c08c1fc856f63e94a75554a52c82abc7801620dc80c0587ba",
+      "source": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz: src/c/libffi_x86_x64 source-header notices; archive sha256 dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
     }
   ]
 }

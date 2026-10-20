@@ -55,6 +55,40 @@ class FakeBackend:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_start_ticket_canceled_during_readiness_cannot_send_input(self):
+        entered, release, canceled = threading.Event(), threading.Event(), threading.Event()
+        def readiness():
+            entered.set()
+            release.wait(1)
+            return []
+        self.backend.readiness = readiness
+        errors = []
+        def start():
+            try:
+                self.runner.start(self.workflow, target=TARGET, dry_run=False, armed=True,
+                                  cancel_event=canceled)
+            except RuntimeError as error:
+                errors.append(str(error))
+        thread = threading.Thread(target=start)
+        thread.start()
+        self.assertTrue(entered.wait(1))
+        canceled.set()
+        release.set()
+        thread.join(1)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, ["Start was canceled."])
+        self.assertFalse(self.runner.running)
+        self.assertEqual(self.backend.calls, [])
+
+    def test_external_stop_ticket_releases_held_key(self):
+        canceled = threading.Event()
+        self.backend.on_down = canceled.set
+        self.runner.start(self.workflow, target=TARGET, dry_run=False, armed=True,
+                          cancel_event=canceled)
+        self.runner.join(1)
+        self.assertFalse(self.runner.running)
+        self.assertEqual(self.backend.calls, [("down", "w"), ("up", "w")])
+
     def setUp(self):
         self.countdown = patch("afk_grinder.engine.COUNTDOWN_SECONDS", 0)
         self.countdown.start()

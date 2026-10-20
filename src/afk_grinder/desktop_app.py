@@ -1,0 +1,241 @@
+"""Trusted local WebView shell. All input remains in the guarded Python engine."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import threading
+import time
+from typing import Any
+
+from .build_info import build_info
+from .desktop_controller import DesktopController
+
+_mac_delegate_class: Any = None
+_PUBLIC_BRIDGE_METHODS = frozenset({"get_state", "get_preview", "command"})
+
+
+def allowed_document(url: Any, expected: str) -> bool:
+    """Accept only the exact bundled entry point, without query or fragment."""
+    return isinstance(url, str) and url == expected
+
+
+def restricted_dispatch(original: Any) -> Any:
+    """Prevent pinned pywebview's dotted getattr resolver exposing internals.
+
+    Its API-generation filter alone is not an access-control boundary. The
+    internal callback is required only for Python's evaluate_js completion.
+    No DOM/file/state handlers are registered by this application.
+    """
+    def dispatch(window: Any, name: Any, params: Any, value_id: Any) -> None:
+        if isinstance(name, str) and (name in _PUBLIC_BRIDGE_METHODS or name == "pywebviewAsyncCallback"):
+            original(window, name, params, value_id)
+    return dispatch
+
+
+def _restrict_bridge() -> None:
+    from webview import util
+    guarded = restricted_dispatch(util.js_bridge_call)
+    util.js_bridge_call = guarded
+    # Platform modules normally import after this hook. Rebind cached adapters
+    # too, so an earlier import cannot retain the unrestricted function.
+    for name in ("cocoa", "winforms", "edgechromium"):
+        module = sys.modules.get(f"webview.platforms.{name}")
+        if module is not None and hasattr(module, "js_bridge_call"):
+            module.js_bridge_call = guarded
+
+
+class DesktopAPI:
+    """Expose exactly three methods to pywebview's recursive API discovery."""
+
+    def __init__(self, controller: DesktopController) -> None:
+        self._controller = controller
+        self._allowed = threading.Event()
+        self._observed = threading.Event()
+
+    def get_state(self) -> dict[str, Any]:
+        if not self._allowed.is_set():
+            raise RuntimeError("The trusted local interface is not ready.")
+        self._observed.set()
+        return self._controller.get_state()
+
+    def get_preview(self, preview_id: int) -> Any:
+        if not self._allowed.is_set():
+            raise RuntimeError("The trusted local interface is not ready.")
+        return self._controller.get_preview(preview_id)
+
+    def command(self, name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if name != "stop" and not self._allowed.is_set():
+            raise RuntimeError("The trusted local interface is not ready.")
+        return self._controller.command(name, payload)
+
+
+def _install_navigation_guard(window: Any, expected: str, rejected: Any) -> Any:
+    """Install native navigation cancellation before the entry point loads.
+
+    The adapters target pinned pywebview 6.2.1. CSP separately restricts page
+    subresources. A guard failure closes the shell before exposing its API.
+    """
+    global _mac_delegate_class
+    if sys.platform == "darwin":
+        from webview.platforms.cocoa import BrowserView
+        native = BrowserView.instances[window.uid].webview
+        original = native.navigationDelegate()
+        if _mac_delegate_class is None:
+            # Subclassing preserves WebKit callback metadata and pywebview's
+            # load-completion bridge injection, without forwarding selectors.
+            class AFKLocalNavigationDelegate(type(original)):
+                def webView_decidePolicyForNavigationAction_decisionHandler_(self, view, action, handler):
+                    url = str(action.request().URL().absoluteString())
+                    if allowed_document(url, self._afk_expected):
+                        handler(1)  # WKNavigationActionPolicyAllow
+                    else:
+                        handler(0)  # WKNavigationActionPolicyCancel
+                        self._afk_rejected()
+
+            _mac_delegate_class = AFKLocalNavigationDelegate
+        delegate = _mac_delegate_class.alloc().init()
+        delegate._afk_expected = expected
+        delegate._afk_rejected = rejected
+        native.setNavigationDelegate_(delegate)
+        return delegate
+    if sys.platform == "win32":
+        native = window.native.webview
+        def on_navigation(_sender: Any, event: Any) -> None:
+            if not allowed_document(str(event.Uri), expected):
+                event.Cancel = True
+                rejected()
+
+        native.NavigationStarting += on_navigation
+        return on_navigation
+    raise RuntimeError("The native launcher supports Windows and macOS only.")
+
+
+def open_desktop(*, smoke: bool = False) -> None:
+    """Run the native launcher, or a no-input bridge/navigation smoke check."""
+    if sys.platform not in {"darwin", "win32"}:
+        raise RuntimeError("The native launcher supports Windows and macOS only.")
+    import webview
+    _restrict_bridge()
+
+    if smoke:
+        backend = None
+    else:
+        from .backends import create_backend
+        try:
+            backend = create_backend()
+        except Exception:
+            backend = None
+    metadata = build_info()
+    controller = DesktopController(backend=backend, buildmetadata=metadata)
+    api = DesktopAPI(controller)
+    entry = Path(__file__).with_name("web") / "index.html"
+    if not entry.is_file():
+        controller.close()
+        raise RuntimeError("Bundled launcher files are missing.")
+    url = entry.resolve().as_uri()
+    webview.settings.update({"ALLOW_FILE_URLS": False, "ALLOW_DOWNLOADS": False,
+                             "OPEN_EXTERNAL_LINKS_IN_BROWSER": False,
+                             "REMOTE_DEBUGGING_PORT": None, "IGNORE_SSL_ERRORS": False})
+    identity = metadata["commit"][:7]
+    if metadata["commit"].endswith("-dirty"):
+        identity += "-dirty"
+    window = webview.create_window(f"AFK Grinder {metadata['version']} · {identity}", url=url,
+                                   js_api=api, width=1180, height=800, min_size=(620, 450),
+                                   background_color="#090d19", text_select=True)
+    guard: list[Any] = []
+    failed = threading.Event()
+    rejected = threading.Event()
+    closed = threading.Event()
+    close_worker_started = threading.Event()
+
+    def reject_navigation() -> None:
+        api._allowed.clear()
+        controller.command("stop", {})
+        rejected.set()
+
+    def before_show() -> None:
+        try:
+            guard.append(_install_navigation_guard(window, url, reject_navigation))
+        except Exception:
+            failed.set()
+            controller.close()
+            # Public destroy waits for the shown event, which has not fired
+            # during before_show. Close on a worker once startup can proceed.
+            threading.Thread(target=window.destroy, daemon=True).start()
+
+    def before_load() -> None:
+        api._allowed.clear()
+
+    def loaded() -> None:
+        try:
+            if guard and allowed_document(window.get_current_url(), url) and not failed.is_set():
+                api._allowed.set()
+            else:
+                failed.set()
+                window.destroy()
+        except Exception:
+            failed.set()
+            window.destroy()
+
+    def finish_close() -> None:
+        while not closed.is_set():
+            if controller.close():
+                window.destroy()
+                return
+            time.sleep(0.02)
+
+    def closing() -> bool:
+        api._allowed.clear()
+        if controller.close():
+            return True
+        if not close_worker_started.is_set():
+            close_worker_started.set()
+            threading.Thread(target=finish_close, daemon=True, name="launcher-close").start()
+        return False
+
+    window.events.before_show += before_show
+    window.events.before_load += before_load
+    window.events.loaded += loaded
+    window.events.closing += closing
+    window.events.closed += closed.set
+
+    def smoke_check() -> None:
+        from .capture.service import BackgroundJob
+        job = BackgroundJob("sdk")
+        deadline = time.monotonic() + 18
+        result = None
+        try:
+            while time.monotonic() < deadline and not closed.is_set() and not failed.is_set():
+                result = job.poll() if result is None else result
+                if result is not None and api._observed.is_set():
+                    if window.evaluate_js("document.documentElement.dataset.bridgeReady === 'true'"):
+                        break
+                time.sleep(0.05)
+            else:
+                raise RuntimeError("Launcher bridge startup timed out.")
+            missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
+            if not missing_sdk and (result.error or result.report is None):
+                raise RuntimeError("Spawned recognition service failed.")
+            if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
+                raise RuntimeError("Inactive cleanup warning is visible.")
+            window.run_js("window.location.href = 'about:blank';")
+            if not rejected.wait(2) or not allowed_document(window.get_current_url(), url):
+                raise RuntimeError("Native navigation guard failed.")
+        except Exception:
+            failed.set()
+        finally:
+            job.cancel()
+            controller.close()
+            window.destroy()
+
+    try:
+        webview.start(smoke_check if smoke else None,
+                      gui="cocoa" if sys.platform == "darwin" else "edgechromium",
+                      debug=False, http_server=False, private_mode=True)
+    finally:
+        controller.close()
+    if failed.is_set() or (smoke and not rejected.is_set()):
+        raise RuntimeError("Native launcher startup or bridge check failed. WebView2 is required on Windows.")
+    if smoke and sys.stdout is not None:
+        print("Local launcher, bridge, navigation guard and spawned SDK service passed. No OS input or capture used.")

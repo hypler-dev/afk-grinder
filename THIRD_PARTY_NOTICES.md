@@ -15,7 +15,11 @@ The selected SDK is MaaFw 5.14.3, upstream MaaXYZ/MaaFramework tag v5.14.3, sour
 
 ## Other dependencies
 
-Python, Tcl/Tk, PyObjC, NumPy, strenum, packaging, and the PyInstaller runtime keep their upstream terms. uv.lock and the build's `legal/build-runtime/build-dependencies.json` record resolved/installed versions. Retained upstream texts are in `licenses/`; each build also copies its actual Python runtime and installed baseline dependency notices. Inventory does not prove runtime inclusion. PyInstaller's build-tool license has a distribution exception; it does not change AFK Grinder's project license.
+Python, Tcl/Tk, PyObjC, pywebview, Bottle, typing_extensions, proxy-tools, pythonnet, clr_loader, CFFI, pycparser, NumPy, strenum, packaging, and the PyInstaller runtime keep their upstream terms. uv.lock and the build's `legal/build-runtime/build-dependencies.json` record resolved/installed versions. Retained upstream texts are in `licenses/`; each build also copies its actual Python runtime and installed baseline dependency notices. Inventory does not prove runtime inclusion. PyInstaller's build-tool license has a distribution exception; it does not change AFK Grinder's project license.
+
+The launcher pins pywebview 6.2.1 (BSD-3-Clause) and uses the operating system's WebKit/WebView2 runtime. Its bundled Microsoft WebView2 SDK DLLs match official NuGet 1.0.3856.49; the SDK license and third-party notice are retained in `licenses/`. The application does not redistribute the WebView2 browser runtime or install it automatically. pywebview's own legacy interop DLLs retain its project license.
+
+proxy-tools 0.1.0 package metadata says MIT, while its source header identifies BSD and names Armin Ronacher and Jonathan Tushman. Its upstream BSD notice is retained explicitly because the published archive omits a license file. Other new dependency notices accompany the build's actual installed versions, including metadata-declared license files such as pythonnet's AUTHORS.md. See [dependency evidence](docs/DEPENDENCIES.md) for exact sources and remaining distribution gates.
 
 ## Game content and imports
 

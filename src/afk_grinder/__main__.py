@@ -14,6 +14,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="Print native readiness without sending input")
     mode.add_argument("--dry-run", action="store_true", help="Run the default template without OS input or GUI")
+    mode.add_argument("--legacy-ui", action="store_true", help="Open the earlier Tk prototype for troubleshooting")
     mode.add_argument("--ui-smoke", action="store_true", help="Open and close a dry-run UI without native input")
     mode.add_argument("--sdk-check", action="store_true", help="Check optional local recognition with synthetic pixels only")
     mode.add_argument("--sdk-worker", action="store_true", help=argparse.SUPPRESS)
@@ -75,52 +76,22 @@ def main() -> None:
             print(f"Native backend unavailable: {exc}", file=sys.stderr)
             sys.exit(1)
         return
-    from .tk_runtime import configure_tk
+    if args.legacy_ui:
+        from .tk_runtime import configure_tk
+        from .ui import main as open_ui
 
-    configure_tk()
-    if args.ui_smoke:
-        import tkinter as tk
-        from .capture.service import BackgroundJob
-        from .ui import App
-
-        root = tk.Tk()
-        app = App(root, backend=None)
-        job = BackgroundJob("sdk")
-        failure = []
-        probe_complete = False
-
-        def finish_probe() -> None:
-            nonlocal probe_complete
-            result = job.poll()
-            if result is None:
-                root.after(20, finish_probe)
-                return
-            missing_optional_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
-            if not missing_optional_sdk and (result.error or result.report is None):
-                failure.append("Spawned recognition service failed its no-input smoke check.")
-            probe_complete = True
-            app._on_close()
-
-        try:
-            root.after(20, finish_probe)
-            root.mainloop()
-        finally:
-            job.cancel()
-            app.runner.stop()
-            app.runner.join()
-            try:
-                root.destroy()
-            except tk.TclError:
-                pass
-        if not probe_complete or failure:
-            if sys.stderr is not None:
-                print(failure[0] if failure else "UI closed before observation smoke completed.", file=sys.stderr)
-            sys.exit(1)
-        print("Dry-run UI and spawned SDK-service startup passed. No OS input or capture used.")
+        configure_tk()
+        open_ui()
         return
-    from .ui import main as open_ui
+    from .desktop_app import open_desktop
 
-    open_ui()
+    try:
+        open_desktop(smoke=args.ui_smoke)
+    except Exception:
+        if sys.stderr is not None:
+            print("The native launcher could not start. Windows requires the Microsoft WebView2 runtime. "
+                  "Use --legacy-ui for the earlier troubleshooting interface.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

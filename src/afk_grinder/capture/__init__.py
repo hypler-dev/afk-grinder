@@ -19,9 +19,84 @@ PhysicalSize = tuple[int, int]
 Scale = tuple[float, float]
 _MAX_PIXELS = 16_000_000
 
+CAPTURE_DIAGNOSTIC_CODES = frozenset({
+    "permission",
+    "window_count",
+    "window_missing",
+    "geometry",
+    "black_frame",
+    "timeout",
+    "conversion",
+    "unavailable",
+    "unexpected",
+})
+CAPTURE_DIAGNOSTIC_STAGES = frozenset({
+    "initialization",
+    "preflight",
+    "discovery",
+    "window_selection",
+    "filter_geometry",
+    "display_selection",
+    "screenshot",
+    "pixel_conversion",
+    "frame_validation",
+    "worker",
+})
+CAPTURE_DIAGNOSTIC_ERROR_TYPES = frozenset({
+    "capture_error",
+    "attribute_error",
+    "type_error",
+    "value_error",
+    "runtime_error",
+    "timeout_error",
+    "unexpected",
+})
+
+
+@dataclass(frozen=True)
+class CaptureDiagnostic:
+    """Safe, bounded capture failure metadata for IPC and UI labels."""
+
+    code: str
+    stage: str
+    error_type: str
+
+    def __post_init__(self) -> None:
+        if self.code not in CAPTURE_DIAGNOSTIC_CODES:
+            raise ValueError("Unknown capture diagnostic code.")
+        if self.stage not in CAPTURE_DIAGNOSTIC_STAGES:
+            raise ValueError("Unknown capture diagnostic stage.")
+        if self.error_type not in CAPTURE_DIAGNOSTIC_ERROR_TYPES:
+            raise ValueError("Unknown capture diagnostic error type.")
+
+    def as_ipc(self) -> dict[str, str]:
+        return {"code": self.code, "stage": self.stage, "error_type": self.error_type}
+
+
+def capture_error_type(error: BaseException) -> str:
+    """Map exceptions to an allowlisted diagnostic value without message data."""
+    if isinstance(error, CaptureError):
+        return "capture_error"
+    if isinstance(error, AttributeError):
+        return "attribute_error"
+    if isinstance(error, TypeError):
+        return "type_error"
+    if isinstance(error, ValueError):
+        return "value_error"
+    if isinstance(error, RuntimeError):
+        return "runtime_error"
+    if isinstance(error, TimeoutError):
+        return "timeout_error"
+    return "unexpected"
+
 
 class CaptureError(RuntimeError):
     """A capture precondition or native observation could not be verified."""
+
+    def __init__(self, message: str, *, code: str = "unexpected", stage: str = "initialization",
+                 error_type: str = "capture_error") -> None:
+        super().__init__(message)
+        self.diagnostic = CaptureDiagnostic(code=code, stage=stage, error_type=error_type)
 
 
 @dataclass(frozen=True)

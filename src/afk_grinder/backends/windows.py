@@ -17,6 +17,9 @@ class WindowsBackend:
     """Bounded Win32 keyboard and mouse adapter; never acquires focus."""
 
     _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    _GWL_EXSTYLE = -20
+    _WS_EX_TOOLWINDOW = 0x00000080
+    _MAX_DISCOVERY_WINDOWS = 4096
     _VK_ESCAPE = 0x1B
     _INPUT_MOUSE = 0
     _INPUT_KEYBOARD = 1
@@ -103,6 +106,17 @@ class WindowsBackend:
 
         self._user32.GetForegroundWindow.argtypes = []
         self._user32.GetForegroundWindow.restype = wintypes.HWND
+        self._WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        self._user32.EnumWindows.argtypes = [self._WNDENUMPROC, wintypes.LPARAM]
+        self._user32.EnumWindows.restype = wintypes.BOOL
+        self._user32.IsWindow.argtypes = [wintypes.HWND]
+        self._user32.IsWindow.restype = wintypes.BOOL
+        self._user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        self._user32.IsWindowVisible.restype = wintypes.BOOL
+        self._user32.IsIconic.argtypes = [wintypes.HWND]
+        self._user32.IsIconic.restype = wintypes.BOOL
+        self._user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+        self._user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
         self._user32.GetWindowThreadProcessId.argtypes = [
             wintypes.HWND,
             ctypes.POINTER(wintypes.DWORD),
@@ -165,6 +179,105 @@ class WindowsBackend:
             )
         finally:
             self._kernel32.CloseHandle(handle)
+
+    def discover_targets(self) -> tuple[Target, ...]:
+        """List verified Roblox windows without focusing, prompting, or sending input."""
+        targets: dict[tuple[int, str, str, str], Target] = {}
+        callback_count = 0
+        capped = False
+        callback_error: RuntimeError | None = None
+
+        def inspect_window(hwnd: Any, _lparam: Any) -> bool:
+            nonlocal callback_count, capped, callback_error
+            callback_count += 1
+            try:
+                target = self._discovered_window_target(hwnd)
+                if target is not None:
+                    targets[(target.pid, target.token, target.executable, target.identifier)] = target
+            except RuntimeError as error:
+                callback_error = error
+                return False
+            if callback_count >= self._MAX_DISCOVERY_WINDOWS:
+                capped = True
+                return False
+            return True
+
+        try:
+            callback_factory = getattr(self, "_WNDENUMPROC", None)
+            callback = callback_factory(inspect_window) if callable(callback_factory) else inspect_window
+            enumerated = self._user32.EnumWindows(callback, 0)
+            if callback_error is not None:
+                raise callback_error
+            if not enumerated:
+                if capped:
+                    raise RuntimeError(
+                        "Windows target discovery stopped after "
+                        f"{self._MAX_DISCOVERY_WINDOWS} windows."
+                    )
+                raise RuntimeError("Windows target discovery failed: EnumWindows returned false.")
+            return tuple(sorted(targets.values(), key=lambda target: (
+                target.pid,
+                target.token,
+                target.executable,
+                target.identifier,
+            )))
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"Windows target discovery failed: {error}") from error
+
+    def _discovered_window_target(self, hwnd: Any) -> Target | None:
+        """Resolve one eligible top-level HWND to an exact Roblox executable."""
+        try:
+            if (
+                not hwnd
+                or not self._user32.IsWindow(hwnd)
+                or not self._user32.IsWindowVisible(hwnd)
+                or self._user32.IsIconic(hwnd)
+            ):
+                return None
+            self._ctypes.set_last_error(0)
+            extended_style = int(self._user32.GetWindowLongPtrW(hwnd, self._GWL_EXSTYLE))
+            if not extended_style and self._ctypes.get_last_error():
+                raise RuntimeError("Windows window check failed: extended style is unavailable.")
+            if extended_style & self._WS_EX_TOOLWINDOW:
+                return None
+            pid = self._wintypes.DWORD()
+            if not self._user32.GetWindowThreadProcessId(hwnd, self._ctypes.byref(pid)) or not pid.value:
+                return None
+            handle = self._kernel32.OpenProcess(
+                self._PROCESS_QUERY_LIMITED_INFORMATION,
+                False,
+                pid.value,
+            )
+            if not handle:
+                return None
+            try:
+                capacity = 32768
+                path = self._ctypes.create_unicode_buffer(capacity)
+                path_length = self._wintypes.DWORD(capacity)
+                if not self._kernel32.QueryFullProcessImageNameW(
+                    handle, 0, path, self._ctypes.byref(path_length)
+                ):
+                    return None
+                executable = ntpath.basename(path.value)
+                if executable.casefold() not in {"robloxplayer.exe", "robloxplayerbeta.exe"}:
+                    return None
+                hwnd_value = self._ctypes.cast(hwnd, self._ctypes.c_void_p).value
+                if hwnd_value is None:
+                    return None
+                return Target(
+                    pid=int(pid.value),
+                    token=str(hwnd_value),
+                    executable=executable,
+                    identifier="win32",
+                )
+            finally:
+                self._kernel32.CloseHandle(handle)
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"Windows target discovery window check failed: {error}") from error
 
     def readiness(self) -> list[str]:
         """Return startup errors. Windows needs no consent preflight API here."""

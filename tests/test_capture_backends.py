@@ -257,6 +257,21 @@ class MacOSCaptureTests(unittest.TestCase):
             adapter._preflight_screen_recording()
         self.assertEqual(quartz.calls, 1)
 
+    def test_native_attribute_error_has_safe_filter_geometry_diagnostic(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        adapter._content_filter = lambda window: (_ for _ in ()).throw(
+            AttributeError("/private/user/window title")
+        )
+
+        with self.assertRaises(CaptureError) as raised:
+            adapter._binding_for_window(FakeContent([]), FakeWindow(700, 42), TARGET)
+
+        error = raised.exception
+        self.assertEqual(error.diagnostic.code, "unexpected")
+        self.assertEqual(error.diagnostic.stage, "filter_geometry")
+        self.assertEqual(error.diagnostic.error_type, "attribute_error")
+        self.assertNotIn("private", str(error.diagnostic))
+
     def test_raw_window_preview_is_explicitly_not_client_content(self) -> None:
         adapter = object.__new__(MacOSCapture)
         adapter._Quartz = FakeQuartz(allowed=True)
@@ -269,6 +284,25 @@ class MacOSCaptureTests(unittest.TestCase):
         self.assertEqual(adapter.discover(TARGET), preview)
         self.assertEqual(preview.region_kind, "window-unverified")
         self.assertFalse(preview.content_verified)
+
+    def test_display_metadata_failures_keep_safe_stage(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        adapter._content_filter = lambda window: object()
+        adapter._filter_geometry = lambda content_filter: ((0, 0, 16, 9), 1.0)
+        def fail():
+            raise AttributeError("/private/window title")
+        content = type("Content", (), {"displays": staticmethod(fail)})()
+        with self.assertRaises(CaptureError) as raised:
+            adapter._binding_for_window(content, FakeWindow(700, 42), TARGET)
+        self.assertEqual(raised.exception.diagnostic.stage, "display_selection")
+        self.assertEqual(raised.exception.diagnostic.error_type, "attribute_error")
+        display = type("Display", (), {"displayID": staticmethod(fail)})()
+        adapter._display_for_rect = lambda displays, rect: display
+        content = type("Content", (), {"displays": lambda self: []})()
+        with self.assertRaises(CaptureError) as raised:
+            adapter._binding_for_window(content, FakeWindow(700, 42), TARGET)
+        self.assertEqual(raised.exception.diagnostic.stage, "display_selection")
+        self.assertNotIn("private", str(raised.exception.diagnostic))
 
     def test_window_identity_lookup_rejects_replacement(self) -> None:
         adapter = object.__new__(MacOSCapture)

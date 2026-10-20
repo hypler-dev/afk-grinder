@@ -127,6 +127,87 @@ class MacOSBackend:
         except Exception as error:
             raise RuntimeError(f"macOS foreground process query failed: {error}") from error
 
+    def discover_targets(self) -> tuple[Target, ...]:
+        """List currently verified Roblox processes without changing focus or permissions."""
+        try:
+            with self._objc.autorelease_pool():
+                resolver_type = getattr(self._AppKit, "NSRunningApplication", None)
+                enumerate_applications = getattr(
+                    resolver_type, "runningApplicationsWithBundleIdentifier_", None
+                )
+                if not callable(enumerate_applications):
+                    raise RuntimeError(
+                        "macOS target discovery unavailable: "
+                        "NSRunningApplication bundle enumerator is unavailable."
+                    )
+                applications = enumerate_applications("com.roblox.RobloxPlayer")
+                if applications is None:
+                    raise RuntimeError(
+                        "macOS target discovery failed: "
+                        "NSRunningApplication returned no application list."
+                    )
+
+                targets: dict[tuple[int, str, str, str], Target] = {}
+                for application in applications:
+                    target = self._discovered_target(application)
+                    if target is not None:
+                        targets[(target.pid, target.token, target.executable, target.identifier)] = target
+                return tuple(sorted(targets.values(), key=lambda target: (
+                    target.pid,
+                    target.token,
+                    target.executable,
+                    target.identifier,
+                )))
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"macOS target discovery failed: {error}") from error
+
+    def _discovered_target(self, candidate: Any) -> Target | None:
+        """Re-resolve one enumerated PID before exposing a stable target."""
+        try:
+            candidate_pid = int(candidate.processIdentifier())
+            candidate_terminated = getattr(candidate, "isTerminated", None)
+            if candidate_pid <= 0 or not callable(candidate_terminated) or candidate_terminated():
+                return None
+
+            resolver_type = getattr(self._AppKit, "NSRunningApplication", None)
+            resolver = getattr(resolver_type, "runningApplicationWithProcessIdentifier_", None)
+            if not callable(resolver):
+                raise RuntimeError(
+                    "macOS target discovery unavailable: "
+                    "NSRunningApplication resolver is unavailable."
+                )
+            application = resolver(candidate_pid)
+            if application is None:
+                return None
+            resolved_pid = int(application.processIdentifier())
+            terminated = getattr(application, "isTerminated", None)
+            if (
+                resolved_pid != candidate_pid
+                or resolved_pid <= 0
+                or not callable(terminated)
+                or terminated()
+            ):
+                return None
+            bundle_identifier = application.bundleIdentifier()
+            executable_url = application.executableURL()
+            if bundle_identifier != "com.roblox.RobloxPlayer" or executable_url is None:
+                return None
+            executable_component = executable_url.lastPathComponent()
+            if not executable_component:
+                return None
+            return Target(
+                pid=resolved_pid,
+                token=str(resolved_pid),
+                executable=str(executable_component),
+                identifier="com.roblox.RobloxPlayer",
+            )
+        except RuntimeError:
+            raise
+        except Exception as error:
+            raise RuntimeError(f"macOS target discovery identity check failed: {error}") from error
+
     def readiness(self) -> list[str]:
         """Check existing permissions only; this method never triggers a macOS prompt."""
         problems: list[str] = []

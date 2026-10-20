@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; img-src 'self' data:; connect-src 'none'; font-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>AFK Grinder</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>@media (max-width:620px){.topbar .compact{display:inline-flex}}</style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Application navigation">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">✦</div><strong>AFK Grinder</strong><p>Helping kids touch grass by automating their games.</p></div>
+      <div class="rail-game"><img id="rail-art" src="assets/pet-world.png" alt=""><div><strong id="rail-game-name">Game library</strong><span id="rail-game-status">Connecting</span></div></div>
+      <nav class="nav" aria-label="Launcher sections">
+        <button type="button" data-route="library" aria-current="page">Library</button>
+        <button type="button" data-route="session">Session</button>
+        <button type="button" data-route="setup">Setup</button>
+        <button type="button" data-route="routines">Routines</button>
+        <button type="button" data-route="packs">Packs</button>
+        <button type="button" data-route="settings">Settings</button>
+      </nav>
+      <div class="rail-stop"><button class="danger" type="button" data-command="stop">Stop all input</button><p><kbd>Esc</kbd> or <kbd>⌘/Ctrl .</kbd></p></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><span id="crumb">Library</span><span class="connection" id="connection" role="status" aria-live="polite">Connecting to desktop bridge…</span><button class="danger compact" type="button" data-command="stop">Stop</button></header>
+      <div class="cleanup-banner" id="cleanup-banner" hidden role="alert"><strong>Cleanup blocked.</strong><span id="cleanup-message">Release held inputs manually, then restart the application.</span></div>
+      <main>
+        <section data-page="library" class="page active" aria-labelledby="library-title">
+          <div class="page-title"><div><p class="eyebrow">Game library</p><h1 id="library-title">Your game launcher</h1><p>Choose a profile. Support status comes from the desktop engine.</p></div></div>
+          <article class="hero"><img id="hero-art" src="assets/pet-world.png" alt="Original concept art, not a game capture"><div class="hero-overlay"><p class="eyebrow">Selected profile</p><h2 id="hero-title">Waiting for desktop bridge</h2><p id="hero-copy">The launcher will show only verified native state.</p><div class="badges"><span class="badge" id="hero-support">Waiting</span><span class="badge warn">Care routines unavailable</span></div><button class="primary" type="button" data-route="setup">Open setup</button></div></article>
+          <div class="section-head"><div><h2>Available profiles</h2><p>Original concept art is not an official logo or a window preview.</p></div></div>
+          <div class="game-grid" id="game-grid" aria-live="polite"></div>
+          <template id="game-template"><article class="game-card"><img alt=""><div class="card-shade"></div><div class="card-body"><span class="badge"></span><h3></h3><p></p><button class="secondary" type="button">Open profile</button></div></article></template>
+        </section>
+
+        <section data-page="session" class="page" aria-labelledby="session-title">
+          <div class="page-title"><div><p class="eyebrow">Supervised session</p><h1 id="session-title">Session</h1><p>Engine state decides whether a run can start.</p></div><span class="badge" id="session-phase">Waiting</span></div>
+          <div class="two-col"><article class="panel"><h2 id="session-heading">Waiting for state</h2><p id="session-message">No local session data is available yet.</p><div class="mode-group" role="group" aria-label="Session mode"><button type="button" data-mode="dry">Dry run</button><button type="button" data-mode="live">Live input</button></div><div class="routine"><div><strong id="template-name">Input check</strong><span id="template-detail">Native template data will appear here.</span></div><span class="badge" id="start-readiness">Waiting</span></div><div class="button-row"><button class="primary" type="button" data-command="start" id="start-button">Start</button><button class="secondary" type="button" data-route="setup">Open setup</button></div><p class="note">Live input uses the engine’s 3-second manual switch and its <span id="limit-seconds">30</span>-second cap. No auto-resume.</p></article>
+            <aside class="panel preview-panel"><div class="panel-heading"><h2>Private window preview</h2><span class="badge" id="preview-phase">Not captured</span></div><div class="preview-wrap"><img id="preview-image" alt="Selected native window preview" hidden><div id="preview-empty"><strong>No preview available</strong><span>Capture happens only through the desktop engine and stays in memory.</span></div></div><p class="note" id="preview-note">A preview does not prove gameplay is ready.</p></aside></div>
+        </section>
+
+        <section data-page="setup" class="page" aria-labelledby="setup-title">
+          <div class="page-title"><div><p class="eyebrow">Required checks</p><h1 id="setup-title">Setup</h1><p>Sign in manually. Keep gameplay visible, with chat and menus closed.</p></div></div>
+          <div class="two-col"><article class="panel"><ol class="setup-list"><li><span>1</span><div><strong>Find a Roblox window</strong><p id="binding-message">Waiting for discovery.</p></div><button class="secondary" type="button" data-command="refresh_targets">Retry</button></li><li id="candidate-row" hidden><span>2</span><div><strong>Select a window</strong><p>More than one verified Roblox window was found.</p><div class="candidate-buttons" id="candidate-buttons"></div></div></li><li><span>3</span><div><strong>Capture private preview</strong><p id="capture-message">Preview stays in memory and is optional.</p></div><div class="button-stack"><button class="secondary" type="button" data-command="capture">Capture</button><button class="ghost" type="button" data-command="clear_preview">Cancel</button></div></li><li><span>4</span><div><strong>Refresh native access</strong><p id="readiness-message">Waiting for native readiness.</p></div><button class="secondary" type="button" data-command="refresh_readiness">Check access</button></li><li><span>5</span><div><strong>Confirm visible gameplay</strong><p>Required for live input. This confirmation is consumed by every live start.</p><label class="check"><input type="checkbox" id="ack-checkbox"> <span>I am signed in. Gameplay visible. Chat and menus closed.</span></label></div></li></ol></article>
+            <aside class="panel"><h2>Setup status</h2><dl class="status-list"><div><dt>Window</dt><dd id="binding-phase">Waiting</dd></div><div><dt>Access</dt><dd id="readiness-phase">Waiting</dd></div><div><dt>Manual confirmation</dt><dd id="ack-phase">Not confirmed</dd></div></dl><div class="notice"><strong>Manual sign-in only.</strong><p>No credentials, chat, trades, purchases, focus stealing, or automatic resume.</p></div></aside></div>
+          <article class="panel roi-panel" id="roi-panel"><div class="panel-heading"><div><h2>Optional preview reference</h2><p>16:9 metadata only. It does not prove gameplay, access, or readiness.</p></div><span class="badge" id="geometry-phase">No reference</span></div><div class="roi-canvas-wrap"><canvas id="roi-canvas" aria-label="Preview reference area editor" tabindex="0"></canvas><p id="roi-empty">Capture a native preview to edit an optional reference area.</p></div><div class="button-row"><button class="secondary" type="button" id="area-check">Check reference</button><button class="ghost" type="button" data-command="reset_area">Reset reference</button></div><p class="note">Enter or Space creates a centered area. Arrow keys move it. Shift plus Arrow keys resizes it. R resets it. On macOS, raw window bounds need manual geometry checking.</p></article>
+        </section>
+
+        <section data-page="routines" class="page" aria-labelledby="routines-title"><div class="page-title"><div><p class="eyebrow">Routine controls</p><h1 id="routines-title">Routines</h1><p>Only bounded declarative input checks are accepted.</p></div></div><div class="two-col"><article class="panel"><h2 id="routine-title">Input check</h2><p id="routine-copy">Template details come from the desktop engine.</p><button class="primary" type="button" data-route="session">Open session</button></article><article class="panel locked"><h2>Indoor care</h2><p>Unavailable until native and game-specific evidence exists.</p><button class="ghost" type="button" disabled>Unavailable</button></article></div><article class="panel advanced"><div class="panel-heading"><div><h2>Advanced template</h2><p>Editable only while idle. This is not the primary session flow.</p></div><span class="badge" id="template-status">Waiting</span></div><label for="template-json">Input-check template JSON</label><textarea id="template-json" rows="9" spellcheck="false"></textarea><div class="button-row"><button class="secondary" type="button" id="template-save">Validate template</button></div><p class="note">Scripts, chat, purchases, trades, credentials, and unattended actions are not accepted.</p></article></section>
+
+        <section data-page="packs" class="page" aria-labelledby="packs-title"><div class="page-title"><div><p class="eyebrow">Game packs</p><h1 id="packs-title">Packs</h1><p>Curated game-specific packs are unavailable.</p></div></div><article class="panel empty-state"><h2>No packs available</h2><p>Installation and long-session support remain unavailable.</p><button class="ghost" type="button" disabled>Packs unavailable</button></article></section>
+
+        <section data-page="settings" class="page" aria-labelledby="settings-title"><div class="page-title"><div><p class="eyebrow">Local launcher</p><h1 id="settings-title">Settings</h1><p>Application information and privacy boundary.</p></div></div><article class="panel"><dl class="settings-list"><div><dt>Appearance</dt><dd>Dark launcher</dd></div><div><dt>Privacy</dt><dd>Memory-only window previews. No telemetry or remote resources.</dd></div><div><dt>Session limit</dt><dd id="settings-limit">Waiting for backend</dd></div><div><dt>Version</dt><dd id="app-version">Waiting for backend</dd></div><div><dt>Commit</dt><dd id="app-commit">Waiting for backend</dd></div><div><dt>Platform</dt><dd id="app-platform">Waiting for backend</dd></div></dl></article></section>
+      </main>
+    </div>
+  </div>
+  <div id="announcer" class="sr-only" aria-live="polite"></div>
+  <div id="error-message" class="error-toast" role="alert" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

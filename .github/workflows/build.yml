@@ -81,6 +81,10 @@ jobs:
       - name: Compile source
         run: uv run --locked --extra build --extra recognition python -m compileall -q src tests tools
 
+      - name: Smoke-test local WebView launcher with no input
+        timeout-minutes: 1
+        run: uv run --locked --extra build --extra recognition python -m afk_grinder --ui-smoke
+
       - name: Smoke-test UI with fake input only
         run: >-
           uv run --locked --extra build --extra recognition python -c

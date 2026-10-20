@@ -1,12 +1,46 @@
 """Build an unsigned local app on its target OS; never publish a release."""
 
 import argparse
+import json
 from pathlib import Path
 import os
 import subprocess
 import sys
+import tomllib
 
 from collect_legal import collect
+
+
+def build_identity(root: Path) -> tuple[str, str]:
+    """Read package version and record exact source identity for Settings."""
+    with (root / "pyproject.toml").open("rb") as project_file:
+        project = tomllib.load(project_file)
+    version = project.get("project", {}).get("version")
+    if not isinstance(version, str) or not version:
+        raise RuntimeError("pyproject.toml must define a non-empty project version.")
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, text=True,
+        capture_output=True,
+    ).stdout.strip()
+    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit):
+        raise RuntimeError("git rev-parse HEAD did not return a full lowercase commit ID.")
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=root, check=True, text=True,
+        capture_output=True,
+    ).stdout
+    return version, f"{commit}-dirty" if dirty else commit
+
+
+def write_build_info(root: Path) -> Path:
+    """Create only the bundled build identity; do not alter package source."""
+    version, commit = build_identity(root)
+    destination = root / "build" / "generated" / "afk_grinder" / "build-info.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps({"version": version, "commit": commit}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return destination
 
 
 def main() -> None:
@@ -18,6 +52,7 @@ def main() -> None:
         raise SystemExit("Only Windows and macOS builds are supported.")
     root = Path(__file__).resolve().parents[1]
     runtime_legal = root / "build" / "runtime-legal"
+    build_info = write_build_info(root)
     collect(runtime_legal)
     command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
                "--windowed", "--onedir", "--name", "AFKGrinder", "--paths", str(root / "src"),
@@ -27,7 +62,10 @@ def main() -> None:
                 "--add-data", f"{root / 'THIRD_PARTY_NOTICES.md'}{os.pathsep}legal",
                 "--add-data", f"{root / 'docs' / 'DEPENDENCIES.md'}{os.pathsep}legal/docs",
                 "--add-data", f"{root / 'licenses'}{os.pathsep}legal/licenses",
-                "--add-data", f"{runtime_legal}{os.pathsep}legal/build-runtime"]
+                "--add-data", f"{runtime_legal}{os.pathsep}legal/build-runtime",
+                "--add-data", f"{root / 'src' / 'afk_grinder' / 'web'}{os.pathsep}afk_grinder/web",
+                "--add-data", f"{build_info}{os.pathsep}afk_grinder",
+                "--copy-metadata", "pywebview"]
     if args.with_recognition:
         # Private build/startup verification only until the source/notice gate is closed.
         # Never collect MaaAgentBinary: those are separate Android agents.
@@ -40,9 +78,13 @@ def main() -> None:
                     "--exclude-module", "numpy", "--exclude-module", "strenum"]
     if sys.platform == "darwin":
         command += ["--osx-bundle-identifier", "com.hypler.afkgrinder"]
-        # Native modules load lazily via importlib so dry run stays portable.
-        # Explicit collection is needed for the frozen app's permission checks.
-        for module in ("AppKit", "Quartz", "ApplicationServices", "ScreenCaptureKit", "objc"):
+        # pywebview selects Cocoa lazily; bundle its WebKit platform path explicitly.
+        for module in ("webview.platforms.cocoa", "WebKit", "AppKit", "Quartz",
+                       "ApplicationServices", "ScreenCaptureKit", "objc"):
+            command += ["--hidden-import", module]
+    else:
+        # pywebview selects WinForms and Edge Chromium lazily at native startup.
+        for module in ("webview.platforms.winforms", "webview.platforms.edgechromium"):
             command += ["--hidden-import", module]
     command.append(str(root / "tools" / "launch.py"))
     environment = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(root / "build" / "pyinstaller-cache"))

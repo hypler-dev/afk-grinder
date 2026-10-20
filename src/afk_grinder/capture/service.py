@@ -16,7 +16,7 @@ import time
 from typing import Any
 
 from afk_grinder.models import Target
-from . import CapturedWindow
+from . import CaptureDiagnostic, CaptureError, CapturedWindow, capture_error_type
 
 MAX_FRAME_BYTES = 16_000_000 * 3
 MAX_HEADER_BYTES = 16_384
@@ -27,6 +27,7 @@ class JobResult:
     frame: CapturedWindow | None = None
     report: dict[str, Any] | None = None
     error: str = ""
+    diagnostic: CaptureDiagnostic | None = None
 
 
 def _worker(connection: Connection, operation: str, target: Target | None,
@@ -67,7 +68,12 @@ def _worker(connection: Connection, operation: str, target: Target | None,
             raise ValueError("Unsupported observation operation.")
     except Exception as error:
         try:
-            connection.send_bytes(json.dumps({"kind": "error", "error": str(error)[:500]}).encode("utf-8"))
+            diagnostic = error.diagnostic if isinstance(error, CaptureError) else CaptureDiagnostic(
+                code="unexpected", stage="worker", error_type=capture_error_type(error)
+            )
+            connection.send_bytes(json.dumps({
+                "kind": "error", "error": str(error)[:500], "diagnostic": diagnostic.as_ipc(),
+            }).encode("utf-8"))
         except (OSError, EOFError, BrokenPipeError):
             pass
     finally:
@@ -82,7 +88,22 @@ def _read_result(connection: Connection, operation: str, target: Target | None) 
         message = header.get("error")
         if not isinstance(message, str) or len(message) > 500:
             raise ValueError("Invalid observation error.")
-        return JobResult(error=message)
+        if "diagnostic" not in header:
+            if set(header) != {"kind", "error"}:
+                raise ValueError("Invalid observation error.")
+            return JobResult(error=message)
+        if set(header) != {"kind", "error", "diagnostic"}:
+            raise ValueError("Invalid observation error.")
+        raw_diagnostic = header["diagnostic"]
+        if not isinstance(raw_diagnostic, dict) or set(raw_diagnostic) != {"code", "stage", "error_type"}:
+            raise ValueError("Invalid capture diagnostic.")
+        if not all(isinstance(value, str) for value in raw_diagnostic.values()):
+            raise ValueError("Invalid capture diagnostic.")
+        try:
+            diagnostic = CaptureDiagnostic(**raw_diagnostic)
+        except ValueError as error:
+            raise ValueError("Invalid capture diagnostic.") from error
+        return JobResult(error=message, diagnostic=diagnostic)
     if operation == "sdk" and header.get("kind") == "sdk":
         report = header.get("report")
         if not isinstance(report, dict) or report.get("native_input") is not False:

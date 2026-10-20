@@ -23,6 +23,8 @@ Extend the existing Python/Tk application incrementally with pinned local MaaFra
 
 The owner additionally requested a polished gaming interface on October 20, selected a dark launcher with violet/cyan accents and bold game cards, and requested previews and cards for multiple games. Use a game library with separate game workspaces and explicit support status. Adopt Me remains the first input-check profile; additional game previews must not imply working automation. Changing games must invalidate window binding and live arming, and must never clear a cleanup-failure block. The interactive visual design is a separate deliverable while the native recognition foundation is integrated; it does not establish native shell or gameplay acceptance.
 
+The owner subsequently instructed “we need to autobind” and approved using the gaming preview as the actual application interface. Integrate that accepted visual direction into the Windows/macOS desktop application using a local bundled web interface, retaining the existing guarded Python input engine. Automatically select a uniquely verified running Roblox target without a foreground-switch countdown; zero targets wait, and ambiguous targets require explicit selection. Automatic binding must never steal focus, arm input, acknowledge gameplay, start a run or resume after interruption. Live Start retains its supervised countdown, foreground checks, manual gameplay acknowledgment and 30-second limit. Expose the application version/source in Settings so older test copies can be distinguished. Capture failures require safe actionable stage/reason diagnostics; native capture acceptance remains open until a real preview succeeds.
+
 ## Users and systems
 
 - Owner and initial user: Jeff.

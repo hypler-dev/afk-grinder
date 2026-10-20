@@ -2,7 +2,7 @@
 
 Authority: [intent.md](../intent.md). Product roadmap: [BUILD.md](../BUILD.md). On October 20, 2026, the owner selected “Dark launcher — violet/cyan, bold game cards” and requested multiple games with previews and cards. This replaces the earlier cream/green direction.
 
-Open [the interactive desktop design](design/index.html). It works offline and uses local artwork and system fonts. It has no game connection, native input, capture, SDK calls, accounts, or telemetry. A permanent design ribbon identifies simulated states. The full launcher remains a design artifact; current downloadable binaries use the existing Python/Tk interface.
+Open [the interactive desktop design](design/index.html). It works offline and uses local artwork and system fonts. It has no game connection, native input, capture, SDK calls, accounts, or telemetry. A permanent design ribbon identifies simulated states. This remains the simulated visual reference. The native application now adopts its game cards and workspace through bundled pywebview files and the guarded Python engine. [DESKTOP_BRIDGE.md](DESKTOP_BRIDGE.md) defines authoritative state; [plan.md](../plan.md) records exact native/build acceptance.
 
 ## Game library
 
@@ -18,9 +18,9 @@ Each selected game owns its setup instructions, routine availability, pack compa
 
 Navigation contains Library, Session, Setup, Routines, Packs, and Settings. Session shows the selected game, routine, current input step, readiness, preview, and the existing 30-second supervised limit. Setup keeps manual sign-in, window selection, access checks, and routine selection distinct. No credentials form, focus stealing, or automatic Resume.
 
-Dry run remains the default. Live input requires fresh setup and manual gameplay acknowledgment. Focus loss clears live readiness and requires setup again. Stopping blocks a new run while release is in progress. Cleanup failure remains latched until the application is restarted after manual input-state checks. Future recognition states and care routines stay labelled as unavailable. No fictional task completions, reward counts, potion progress, or elapsed-time success claims appear.
+Dry run remains the default. Live input requires fresh setup and manual gameplay acknowledgment. Focus loss consumes live acknowledgment and requires a fresh manual gameplay check before another start. Stopping blocks a new run while release is in progress. Cleanup failure remains latched until the application is restarted after manual input-state checks. Future recognition states and care routines stay labelled as unavailable. No fictional task completions, reward counts, potion progress, or elapsed-time success claims appear.
 
-Settings shows the dark appearance, privacy boundary, session limit, and cleanup state. Permission management and the optional synthetic SDK check belong to the native Recognition Setup component and are not simulated as working launcher controls. Keep process IDs, raw JSON, SDK configuration, and developer diagnostics out of the primary flow. Real window previews remain separate from promotional card artwork and must state whether content bounds are verified.
+Settings shows the dark appearance, privacy boundary, session limit, and cleanup state. Permissions remain in operating-system settings. The optional synthetic SDK check remains available through the command-line diagnostic and legacy Recognition Setup; the launcher does not simulate it. Keep process IDs, raw JSON, SDK configuration, and developer diagnostics out of the primary flow. Real window previews remain separate from promotional card artwork and must state whether content bounds are verified.
 
 ## Visual and accessibility rules
 
@@ -30,4 +30,4 @@ Reference desktop width is 1240 px. Navigation contracts on narrower windows and
 
 ## Integration boundary
 
-The Python/Tk input engine remains the only native action path. A separate no-input Recognition Setup component provides the first native capture/SDK surface; the launcher design does not replace that boundary. Game-specific automation requires reviewed profiles, supported screen states, calibration, guarded actions, and native outcome evidence before a card can advertise it as supported. Current care routines, pack installation, longer sessions, assistive-technology acceptance, and hardware verification remain open in [plan.md](../plan.md).
+The guarded Python engine remains the only native action path. The new launcher uses a three-method typed bridge for state, explicit commands and bounded in-memory previews. It opens no HTTP server, loads no remote resources, blocks navigation away from the bundled entry point, and rejects unregistered or dotted bridge method names. Native capture remains an explicit no-input action. The earlier Tk Recognition Setup remains available only through the legacy interface. Game-specific automation requires reviewed profiles, supported screen states, calibration, guarded actions, and native outcome evidence before a card can advertise it as supported. Current care routines, pack installation, longer sessions, assistive-technology acceptance, and hardware verification remain open in [plan.md](../plan.md).

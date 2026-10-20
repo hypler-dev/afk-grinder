@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "afk-grinder"
-version = "0.1.0"
-description = "Supervised Windows/macOS input safety prototype for Roblox"
+version = "0.2.0"
+description = "Local Windows/macOS game launcher with supervised Roblox input checks"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*"]
@@ -15,6 +15,7 @@ dependencies = [
   "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'",
   "pyobjc-framework-Quartz>=11,<13; sys_platform == 'darwin'",
   "pyobjc-framework-ScreenCaptureKit>=11,<13; sys_platform == 'darwin'",
+  "pywebview==6.2.1",
 ]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -32,3 +33,6 @@ afk-grinder = "afk_grinder.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+afk_grinder = ["web/*.html", "web/*.css", "web/*.js", "web/assets/*.png"]

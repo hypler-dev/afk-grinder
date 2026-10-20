@@ -25,13 +25,19 @@ def collect(destination: Path) -> None:
             continue
         version = distribution.version
         label = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{name}-{version}")
+        declared_names = {
+            Path(value).name for value in distribution.metadata.get_all("License-File", [])
+            if isinstance(value, str)
+        }
         notices = []
         for file in distribution.files or []:
             parts = Path(str(file)).parts
             if (not parts or not parts[0].endswith(".dist-info")
                     or any(p in {".", ".."} for p in parts)):
                 continue
-            if not any(word in Path(str(file)).name.lower() for word in ("license", "copying", "notice")):
+            filename = Path(str(file)).name
+            if (filename not in declared_names
+                    and not any(word in filename.lower() for word in ("license", "copying", "notice"))):
                 continue
             source = Path(distribution.locate_file(file))
             if not source.is_file():
