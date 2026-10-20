@@ -67,8 +67,19 @@ def restricted_dispatch(original: Any) -> Any:
     return dispatch
 
 
+def _webview_thread(*args: Any, **kwargs: Any) -> threading.Thread:
+    """Keep WebView response delivery from retaining a closed application."""
+    kwargs["daemon"] = True
+    return threading.Thread(*args, **kwargs)
+
+
 def _restrict_bridge() -> None:
     from webview import util
+    # Pinned pywebview 6.2.1 uses non-daemon utility threads for API replies
+    # and bridge injection. Cocoa reply delivery can wait indefinitely once
+    # its UI loop closes. Only these WebView utilities become daemon threads;
+    # the input runner stays non-daemon and controller.close still awaits it.
+    util.Thread = _webview_thread
     guarded = restricted_dispatch(util.js_bridge_call)
     util.js_bridge_call = guarded
     # Platform modules normally import after this hook. Rebind cached adapters

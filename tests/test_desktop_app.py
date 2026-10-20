@@ -1,6 +1,8 @@
 """Trusted-shell API boundaries with no WebView or native backend."""
 
 import io
+import subprocess
+import sys
 import threading
 from types import SimpleNamespace
 import unittest
@@ -26,6 +28,28 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_pending_real_webview_reply_cannot_hold_process_after_ui_close(self):
+        script = '''
+import threading
+from types import SimpleNamespace
+from afk_grinder.desktop_app import _restrict_bridge
+from webview import util
+waiting = threading.Event()
+def disposed_ui_reply(_script):
+    waiting.set()
+    threading.Event().wait()
+window = SimpleNamespace(_functions={}, _js_api=SimpleNamespace(get_state=lambda: {}),
+                         evaluate_js=disposed_ui_reply)
+_restrict_bridge()
+util.js_bridge_call(window, 'get_state', [], 'reply')
+assert waiting.wait(2), 'The real pinned dispatcher did not reach reply delivery.'
+print('Pending WebView reply does not retain the process.', flush=True)
+'''
+        result = subprocess.run([sys.executable, '-c', script], capture_output=True,
+                                text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'Pending WebView reply does not retain the process.')
+
     def test_smoke_resize_caps_to_host_and_reports_actual_client_width(self):
         window = Mock()
         window.evaluate_js.side_effect = [1024, 1008]

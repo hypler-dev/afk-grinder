@@ -6,6 +6,8 @@ Authority: [intent.md](../intent.md). The owner approved automatic Roblox bindin
 
 The bundled frontend receives exactly three public methods: `get_state()`, `get_preview(preview_id)` and `command(name, payload)`. The WebView loads trusted application HTML/CSS/JavaScript and original local artwork only. No navigation to remote pages, arbitrary file access, command execution, generic Python evaluation or native-controller methods is exposed. Backend state is authoritative; the frontend never simulates readiness, captures, input or completion. Session state stays in memory.
 
+The pinned pywebview 6.2.1 integration runs its utility workers for bridge injection and API-response delivery as daemon threads. A response waiting on a disposed native UI cannot retain the application after close. This does not alter input-worker lifetime: the runner remains non-daemon, and the existing controller close gate still waits for cancellation and input cleanup. The three-method dispatch allowlist and navigation guards remain in force.
+
 `command` returns `{ "ok": true|false, "error": null|{"code": "...", "message": "..."}, "state": STATE }`. State polling uses `get_state()` approximately every 250 milliseconds while visible. Preview images are excluded from polling; fetch a bounded in-memory PNG only when `preview.id` changes. `get_preview(id)` returns `{ "id": id, "data_url": "data:image/png;base64,..." }` only for the current image, otherwise no image.
 
 ## State version 1
