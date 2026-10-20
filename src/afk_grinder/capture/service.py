@@ -69,7 +69,8 @@ def _worker(connection: Connection, operation: str, target: Target | None,
                       "native_rect": frame.native_rect, "physical_size": frame.physical_size,
                       "monitor_id": frame.monitor_id, "scale": frame.scale,
                       "captured_at": frame.captured_at, "region_kind": frame.region_kind,
-                      "content_verified": frame.content_verified}
+                      "content_verified": frame.content_verified,
+                      "capture_expiry_stage": frame.capture_expiry_stage}
             connection.send_bytes(json.dumps(header, allow_nan=False).encode("utf-8"))
             connection.send_bytes(frame.pixels)
         elif operation == "sdk":
@@ -133,7 +134,7 @@ def _read_result(connection: Connection, operation: str, target: Target | None) 
         raise ValueError("Unexpected observation operation result.")
     expected = {"kind", "window_id", "native_rect", "physical_size", "monitor_id", "scale",
                 "captured_at", "region_kind", "content_verified"}
-    if set(header) != expected:
+    if set(header) not in (expected, expected | {"capture_expiry_stage"}):
         raise ValueError("Unexpected frame metadata.")
     for field in ("window_id", "monitor_id"):
         if not isinstance(header[field], str) or not 0 < len(header[field]) <= 128:
@@ -143,7 +144,8 @@ def _read_result(connection: Connection, operation: str, target: Target | None) 
                           physical_size=tuple(header["physical_size"]), monitor_id=header["monitor_id"],
                           scale=tuple(header["scale"]), pixels=connection.recv_bytes(MAX_FRAME_BYTES),
                           format="BGR8", captured_at=header["captured_at"],
-                          region_kind=header["region_kind"], content_verified=header["content_verified"])
+                          region_kind=header["region_kind"], content_verified=header["content_verified"],
+                          capture_expiry_stage=header.get("capture_expiry_stage"))
     return JobResult(frame=frame)
 
 

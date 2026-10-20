@@ -73,8 +73,12 @@ def main() -> None:
     if args.with_recognition:
         # Private build/startup verification only until the source/notice gate is closed.
         # Never collect MaaAgentBinary: those are separate Android agents.
-        command += ["--copy-metadata", "MaaFw", "--collect-binaries", "maa",
-                    "--exclude-module", "MaaAgentBinary"]
+        from PyInstaller.utils.hooks import collect_dynamic_libs
+        from sdk_bundle import select_recognition_binaries
+
+        command += ["--copy-metadata", "MaaFw", "--exclude-module", "MaaAgentBinary"]
+        for source, destination in select_recognition_binaries(collect_dynamic_libs("maa"), sys.platform):
+            command += ["--add-binary", f"{source}{os.pathsep}{destination}"]
         for module in ("maa.library", "maa.tasker", "maa.resource", "maa.controller", "maa.define"):
             command += ["--hidden-import", module]
         for module in ("maa.pipeline", "numpy"):
@@ -99,6 +103,11 @@ def main() -> None:
     command.append(str(root / "tools" / "launch.py"))
     environment = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(root / "build" / "pyinstaller-cache"))
     subprocess.run(command, cwd=root, env=environment, check=True)
+    if args.with_recognition:
+        from sdk_bundle import validate_recognition_bundle
+
+        bundle = root / "dist" / ("AFKGrinder.app" if sys.platform == "darwin" else "AFKGrinder")
+        validate_recognition_bundle(bundle, sys.platform)
     print("Unsigned local app built in dist/. Installation, permissions, and game input require native testing.")
 
 

@@ -8,6 +8,7 @@ The selected SDK is MaaFw 5.14.3, upstream MaaXYZ/MaaFramework tag v5.14.3, sour
 
 - Source: https://github.com/MaaXYZ/MaaFramework/tree/8963191215ca49d6b037802acd07d20a4213160a
 - Upstream license: GNU Lesser General Public License version 3, with its incorporated GNU GPL version 3.
+- Required native helper MaaUtils is pinned by that source tree to `f8994a38ddc6858800dfea8a04e958a0adbfb184`. Its LGPL-3.0 text is byte-identical to the retained `licenses/MaaFramework-LGPL-3.0.md`; [dependency evidence](docs/DEPENDENCIES.md) records its source and verification.
 - The application uses the SDK through its public Python/shared-library interfaces. It does not modify the SDK or restrict users from replacing/rebuilding it with an interface-compatible modified version.
 - The SDK's custom-controller and cancellation APIs are being validated. No upstream Android agents, macro scripts, game artwork, OCR training models, or example plugins are authorized as executable routines.
 - Native dependency source, license texts, copyright notices, hashes, and replacement/rebuild instructions are being inventoried before SDK-bearing binary artifacts are published. Package availability alone does not close this distribution gate. [Dependency evidence](docs/DEPENDENCIES.md) and [the notice manifest](licenses/provenance.json) identify inspected artifacts and remaining work.

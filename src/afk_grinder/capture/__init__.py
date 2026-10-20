@@ -142,6 +142,7 @@ class CapturedWindow:
     captured_at: float
     region_kind: str = "client"
     content_verified: bool = True
+    capture_expiry_stage: str | None = None
 
     def __post_init__(self) -> None:
         _validate_geometry(self.native_rect, self.physical_size, self.scale)
@@ -167,6 +168,10 @@ class CapturedWindow:
             raise ValueError("a client capture must have verified content bounds.")
         if self.region_kind == "window-unverified" and self.content_verified:
             raise ValueError("an unverified window preview cannot claim verified content bounds.")
+        if (self.capture_expiry_stage is not None
+                and (not isinstance(self.capture_expiry_stage, str)
+                     or self.capture_expiry_stage not in {"screenshot", "pixel_conversion", "frame_validation"})):
+            raise ValueError("Unknown capture expiry diagnostic stage.")
 
 
 class CaptureBackend(Protocol):
@@ -187,6 +192,7 @@ def build_frame(
     physical_size: PhysicalSize,
     pixels: bytes,
     captured_at: float | None = None,
+    capture_expiry_stage: str | None = None,
 ) -> CapturedWindow:
     """Construct a validated in-memory frame for a still-valid binding."""
     return CapturedWindow(
@@ -201,6 +207,7 @@ def build_frame(
         captured_at=monotonic() if captured_at is None else captured_at,
         region_kind=binding.region_kind,
         content_verified=binding.content_verified,
+        capture_expiry_stage=capture_expiry_stage,
     )
 
 

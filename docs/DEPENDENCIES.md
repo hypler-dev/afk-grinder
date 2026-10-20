@@ -11,6 +11,7 @@ Original AFK Grinder code and documentation use the unchanged MIT text in [LICEN
 | Component | Version/source | Terms and current use |
 | --- | --- | --- |
 | MaaFw / MaaFramework | 5.14.3; commit `8963191215ca49d6b037802acd07d20a4213160a` | LGPL-3.0; optional local Python/shared-library SDK |
+| MaaUtils | `f8994a38ddc6858800dfea8a04e958a0adbfb184`; required MaaFramework submodule | LGPL-3.0; required native helper library |
 | MaaDeps | v3.0.0; commit `d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7` | Native recipes and notice inventory |
 | MaaDeps vcpkg | `c5a15727ee70fddf0296f0d8aafc3f58916fefac` | Pinned component baseline; licenses vary |
 | ONNX Runtime | 1.29.0 | MIT; local inference |
@@ -27,6 +28,8 @@ Official SDK wheels exist for Windows x64 and Mac arm64/x64; Mac wheel tags indi
 Sources: [pinned MaaFramework](https://github.com/MaaXYZ/MaaFramework/tree/8963191215ca49d6b037802acd07d20a4213160a), [MaaFw 5.14.3](https://pypi.org/project/MaaFw/5.14.3/), [pinned MaaDeps](https://github.com/MaaXYZ/MaaDeps/tree/d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7), [MaaDeps release](https://github.com/MaaXYZ/MaaDeps/releases/tag/v3.0.0).
 
 Inspected arm64 MaaFw wheel SHA-256: `1f7be844dd1b0dbdf8b361cb836cfc6b2611603bce40899a4bcb762b4bf49e9c`. Inspected `MaaDeps-arm64-osx.tar.xz` SHA-256: `407f07b5a98d91e66331058dd1ed50f2d95d93a4e9a1df4615c2b73ef1b5db67`. Both match official metadata. The MaaDeps archive supplied 89 retained notice files. [licenses/provenance.json](../licenses/provenance.json) records source paths and hashes; it inventories notices, not final runtime inclusion.
+
+The pinned MaaFramework Git tree identifies [`source/MaaUtils`](https://github.com/MaaXYZ/MaaUtils/tree/f8994a38ddc6858800dfea8a04e958a0adbfb184) at the revision above; its tree has no nested submodules. The pinned MaaDeps tree identifies the [`microsoft/vcpkg`](https://github.com/microsoft/vcpkg/tree/c5a15727ee70fddf0296f0d8aafc3f58916fefac) submodule at the recorded baseline. MaaUtils' upstream LGPL text was fetched from its exact revision and byte-compared with retained `licenses/MaaFramework-LGPL-3.0.md`: both have SHA-256 `446e755fae55ff034bbb21be44670b5f116c2b2667947e7036f2bfe6632539a8`. This records the required source graph and common license text; corresponding-source archives, verified rebuilds and modified-library replacement evidence remain open.
 
 ## Existing application and build runtime
 

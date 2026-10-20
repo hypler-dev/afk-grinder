@@ -64,6 +64,8 @@ Recognition Setup supports arbitrary positive in-bounds physical-pixel rectangle
 
 Expired manual-calibration captures report the fixed `stale` diagnostic. Parent-local receipt and successful-teardown timestamps distinguish `capture_freshness`, `worker_exit_freshness`, and `preview_freshness`; these describe where the 0.5-second budget was already exceeded, not a unique native root cause. Missing or invalid timing metadata falls back to `preview_freshness`. Timing values are not exposed to the web bridge or persisted. Layout mismatch remains `geometry` at `preview_geometry`. Diagnostics never make an expired observation usable, change its capture timestamp, skip child-exit checks, or alter ordinary historical-preview behavior.
 
+When the parent proves that a frame was already expired at receipt, an optional fixed worker hint can refine `capture_freshness` to `screenshot`, `pixel_conversion`, or `frame_validation`, identifying the first acquisition-phase checkpoint past the unchanged budget. The hint contains no timing values and cannot authorize an observation. macOS discovery excludes desktop and off-screen windows through ScreenCaptureKit's filtered query; fresh pre-capture and post-capture discovery and all identity, visibility, filter, display, scale and geometry checks remain required.
+
 ## Compatibility and migration
 
 ### Native preview and restricted pack foundations

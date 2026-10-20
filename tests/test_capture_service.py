@@ -1,6 +1,7 @@
 """Native observation process boundaries tested without native operations."""
 
 import json
+from dataclasses import replace
 import queue
 import threading
 import time
@@ -190,6 +191,28 @@ class CaptureServiceTests(unittest.TestCase):
         self.assertNotIn("completed_at", header)
         self.assertLessEqual(len(pipe.sent[1]), MAX_FRAME_BYTES)
         self.assertTrue(pipe.closed)
+
+    def test_capture_phase_hint_roundtrip_and_strict_allowlist(self):
+        frame = CapturedWindow(TARGET, "99", (0, 0, 2, 1), (2, 1), "screen", (1, 1),
+                               b"\x01\x02\x03" * 2, "BGR8", 10,
+                               capture_expiry_stage="frame_validation")
+        pipe = Pipe()
+        backend = Mock()
+        backend.snapshot.return_value = frame
+        with patch("afk_grinder.capture.service.sys.platform", "darwin"), \
+                patch("afk_grinder.capture.macos.MacOSCapture", return_value=backend):
+            gate = threading.Event()
+            gate.set()
+            _worker(pipe, "capture", TARGET, gate, time.monotonic() + 1)
+        self.assertEqual(_read_result(Pipe(pipe.sent), "capture", TARGET).frame, frame)
+        header = json.loads(pipe.sent[0])
+        for invalid in ("/private/window title", "worker_exit", 1, [], {}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                malformed = dict(header, capture_expiry_stage=invalid)
+                _read_result(Pipe([json.dumps(malformed).encode(), frame.pixels]), "capture", TARGET)
+        del header["capture_expiry_stage"]
+        self.assertEqual(_read_result(Pipe([json.dumps(header).encode(), frame.pixels]), "capture", TARGET).frame,
+                         replace(frame, capture_expiry_stage=None))
 
     def test_capture_deadline_after_backend_construction_skips_snapshot(self):
         pipe = Pipe()

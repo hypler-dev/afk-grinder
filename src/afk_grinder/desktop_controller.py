@@ -105,7 +105,8 @@ def _capture_freshness(frame: CapturedWindow, result: JobResult, now: float) -> 
     if not frame.captured_at <= received_at <= completed_at <= now:
         return fallback
     if received_at - frame.captured_at > 0.5:
-        return CaptureDiagnostic(code="stale", stage="capture_freshness", error_type="value_error")
+        return CaptureDiagnostic(code="stale", stage=frame.capture_expiry_stage or "capture_freshness",
+                                 error_type="value_error")
     if completed_at - frame.captured_at > 0.5:
         return CaptureDiagnostic(code="stale", stage="worker_exit_freshness", error_type="value_error")
     if now - frame.captured_at > 0.5:

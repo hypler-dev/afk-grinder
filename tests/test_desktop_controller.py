@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import queue
 import sys
 import threading
@@ -14,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from afk_grinder.capture import CapturedWindow
 from afk_grinder.capture.service import JobResult
-from afk_grinder.desktop_controller import DesktopController
+from afk_grinder.desktop_controller import DesktopController, _capture_freshness
 from afk_grinder.engine import Status
 from afk_grinder.models import Target
 from afk_grinder.recognition.content_calibration import ContentCalibration
@@ -360,6 +361,18 @@ class DesktopControllerTests(unittest.TestCase):
                 self.assertEqual(preview["error"]["stage"], stage)
                 self.assertIsNone(controller._content_calibration)
                 self.assertIsNone(controller._tracker.latest)
+
+    def test_worker_phase_hint_only_refines_parent_proven_capture_expiry(self) -> None:
+        for hint in ("screenshot", "pixel_conversion", "frame_validation"):
+            with self.subTest(hint=hint):
+                captured = replace(frame(captured_at=9.0), capture_expiry_stage=hint)
+                result = completed_result(captured, received_at=10.0, completed_at=10.0)
+                self.assertEqual(_capture_freshness(captured, result, 10.0).stage, hint)
+                invalid = completed_result(captured, received_at=8.0, completed_at=10.0)
+                self.assertEqual(_capture_freshness(captured, invalid, 10.0).stage, "preview_freshness")
+                fresh = replace(captured, captured_at=10.0)
+                self.assertIsNone(_capture_freshness(fresh, completed_result(
+                    fresh, received_at=10.0, completed_at=10.0), 10.0))
 
     def test_manual_calibration_accepts_exact_half_second_boundary(self) -> None:
         controller = self.make_controller((TARGET_ONE,))

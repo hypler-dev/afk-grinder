@@ -83,7 +83,9 @@ class MacOSCapture:
         # conversion, validation, IPC, or publication.
         started_at = monotonic()
         image = self._at_stage("screenshot", self._capture_window_image, window, binding)
+        screenshot_completed_at = monotonic()
         width, height, pixels = self._at_stage("pixel_conversion", self._bgr8_pixels, image)
+        pixels_completed_at = monotonic()
         if (width, height) != self._expected_pixels(binding):
             raise CaptureError("macOS capture dimensions differ from the verified window geometry.",
                                code="geometry", stage="frame_validation")
@@ -98,9 +100,18 @@ class MacOSCapture:
         if after != binding:
             raise CaptureError("macOS window content geometry changed during capture.",
                                code="geometry", stage="frame_validation")
+        validation_completed_at = monotonic()
+        # This fixed label explains an already-expired frame only. It never
+        # substitutes for the original acquisition timestamp or parent checks.
+        expiry_stage = next((stage for stage, completed_at in (
+            ("screenshot", screenshot_completed_at),
+            ("pixel_conversion", pixels_completed_at),
+            ("frame_validation", validation_completed_at),
+        ) if completed_at - started_at > 0.5), None)
         return self._at_stage(
             "frame_validation", build_frame, binding,
             physical_size=(width, height), pixels=pixels, captured_at=started_at,
+            capture_expiry_stage=expiry_stage,
         )
 
     def snapshot(self, target: Target) -> CapturedWindow:
@@ -167,11 +178,14 @@ class MacOSCapture:
             result.update(content=content, error=error)
             event.set()
         getter = getattr(self._ScreenCaptureKit.SCShareableContent,
-                         "getShareableContentWithCompletionHandler_", None)
+                         "getShareableContentExcludingDesktopWindows_onScreenWindowsOnly_completionHandler_", None)
         if not callable(getter):
             raise CaptureError("macOS ScreenCaptureKit shareable-content API is unavailable.",
                                code="unavailable", stage="discovery")
-        getter(complete)
+        # Only visible application windows can qualify. Avoid enumerating
+        # desktop and off-screen windows, while retaining fresh SCK discovery
+        # both before and after acquisition and all existing identity checks.
+        getter(True, True, complete)
         if not event.wait(5):
             raise CaptureError("macOS ScreenCaptureKit content discovery timed out.",
                                code="timeout", stage="discovery")

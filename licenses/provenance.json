@@ -4,7 +4,10 @@
     {
       "file": "MaaFramework-LGPL-3.0.md",
       "sha256": "446e755fae55ff034bbb21be44670b5f116c2b2667947e7036f2bfe6632539a8",
-      "source": "https://github.com/MaaXYZ/MaaFramework/blob/8963191215ca49d6b037802acd07d20a4213160a/LICENSE.md"
+      "source": "https://github.com/MaaXYZ/MaaFramework/blob/8963191215ca49d6b037802acd07d20a4213160a/LICENSE.md",
+      "additional_sources": [
+        "https://github.com/MaaXYZ/MaaUtils/blob/f8994a38ddc6858800dfea8a04e958a0adbfb184/LICENSE.md"
+      ]
     },
     {
       "file": "GPL-3.0.txt",

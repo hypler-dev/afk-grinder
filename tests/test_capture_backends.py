@@ -248,6 +248,42 @@ class WindowsCaptureTests(unittest.TestCase):
 
 
 class MacOSCaptureTests(unittest.TestCase):
+    def test_shareable_query_excludes_desktop_and_offscreen_windows(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        content = object()
+        getter = Mock(side_effect=lambda desktop, onscreen, complete: complete(content, None))
+        adapter._ScreenCaptureKit = SimpleNamespace(SCShareableContent=SimpleNamespace(
+            getShareableContentExcludingDesktopWindows_onScreenWindowsOnly_completionHandler_=getter,
+        ))
+        self.assertIs(adapter._shareable_content(), content)
+        self.assertEqual(getter.call_args.args[:2], (True, True))
+
+    def test_missing_filtered_query_fails_closed(self) -> None:
+        adapter = object.__new__(MacOSCapture)
+        broad_query = Mock()
+        adapter._ScreenCaptureKit = SimpleNamespace(SCShareableContent=SimpleNamespace(
+            getShareableContentWithCompletionHandler_=broad_query,
+        ))
+        with self.assertRaises(CaptureError) as raised:
+            adapter._shareable_content()
+        self.assertEqual(raised.exception.diagnostic.stage, "discovery")
+        broad_query.assert_not_called()
+
+    def test_capture_preserves_original_timestamp_and_locates_first_expired_phase(self) -> None:
+        cases = (
+            ((10.0, 10.6, 10.7, 10.8), "screenshot"),
+            ((10.0, 10.1, 10.6, 10.7), "pixel_conversion"),
+            ((10.0, 10.1, 10.2, 10.6), "frame_validation"),
+            ((10.0, 10.2, 10.3, 10.5), None),
+        )
+        for times, stage in cases:
+            with self.subTest(stage=stage):
+                adapter = self._fake_capture([MAC_BINDING, MAC_BINDING], (2, 1, b"\x01" * 6))
+                with patch("afk_grinder.capture.macos.monotonic", side_effect=times):
+                    frame = adapter.capture(MAC_BINDING)
+                self.assertEqual(frame.captured_at, 10.0)
+                self.assertEqual(frame.capture_expiry_stage, stage)
+
     def test_new_worker_initializes_display_environment_without_activation(self) -> None:
         application = Mock()
         application.setActivationPolicy_.return_value = True
