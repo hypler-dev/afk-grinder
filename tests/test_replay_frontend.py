@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 
 
@@ -27,8 +28,10 @@ global.window = { setTimeout, clearTimeout, setInterval, clearInterval, addEvent
 let resolvers = [];
 window.pywebview.api.get_preview = () => new Promise((resolve) => resolvers.push(resolve));
 const commands = []; window.pywebview.api.command = async (name, payload) => { commands.push({name, payload}); return { ok: true }; };
-let source = fs.readFileSync(process.argv[1], 'utf8');
-source = source.replace("  route('library'); render(); poll(); window.setInterval(poll, POLL_MS);\n})();", "  globalThis.__replayTest = { model, applyState, updateRecordingDraft, deleteReplaySession, safeReplayDataUrl };\n})();");
+let source = fs.readFileSync(process.argv[1], 'utf8').replace(/\r\n?/g, '\n');
+const startup = "  route('library'); render(); poll(); window.setInterval(poll, POLL_MS);\n})();";
+if (!source.includes(startup)) throw new Error('replay harness startup anchor is missing');
+source = source.replace(startup, "  globalThis.__replayTest = { model, applyState, updateRecordingDraft, deleteReplaySession, safeReplayDataUrl };\n})();");
 eval(source);
 const ui = globalThis.__replayTest;
 const replay = (frameId = null, phase = 'ready') => ({ phase, message: phase === 'error' ? 'Replay index is unavailable.' : 'Replay ready.', settings: { enabled: false, retention_days: 7, image_format: 'webp', max_width: 960, quality: 60, interval_seconds: 2, max_bytes: 2 * 1024 * 1024 * 1024 }, sessions: [{ id: 'a'.repeat(32), started_at: 1700000000, frame_count: 2 }], selected_session: 'a'.repeat(32), has_older_frames: true, has_older_sessions: true, frames: [{ frame_id: '1'.repeat(32), session_id: 'a'.repeat(32), recorded_at: 1700000000, width: 960, height: 540, image_format: 'webp', event: 'frame', state: 'redacted_unknown' }, { frame_id: '2'.repeat(32), session_id: 'a'.repeat(32), recorded_at: 1700000001, width: 960, height: 540, image_format: 'webp', event: 'frame', state: 'gameplay' }], stats: { frame_count: 2, session_count: 1, byte_count: 20 }, frame: frameId ? { frame_id: frameId } : null });
@@ -64,9 +67,15 @@ Promise.resolve().then(() => { if (ui.model.replayImageId === '1'.repeat(32)) th
   if (!ui.safeReplayDataUrl('data:image/jpeg;base64,QQ==') || ui.safeReplayDataUrl('data:image/png;base64,QQ==')) throw new Error('replay data URL validation failed');
 }).catch((error) => { console.error(error); process.exitCode = 1; });
 '''
-        result = subprocess.run(["node", "-e", script, str(APP)], capture_output=True,
-                                text=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stderr)
+        source = APP.read_bytes().replace(b"\r\n", b"\n")
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "app.js"
+            for ending in (b"\n", b"\r\n"):
+                with self.subTest(line_ending=ending):
+                    fixture.write_bytes(source.replace(b"\n", ending))
+                    result = subprocess.run(["node", "-e", script, str(fixture)], capture_output=True,
+                                            text=True, timeout=10)
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

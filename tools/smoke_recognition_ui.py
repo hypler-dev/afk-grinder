@@ -200,13 +200,18 @@ class RecognitionSetupSmoke(unittest.TestCase):
         self.assertIsNone(self.setup._selection)
         self.assertEqual(self.setup._status_var.get(), "Area reset.")
 
-    def test_raw_mac_warning_persists_after_manual_area_check(self):
+    def test_raw_mac_frame_cannot_establish_calibration(self):
         self.complete_capture(frame(region_kind="window-unverified", content_verified=False))
+        self.assertIn("includes window frame", self.setup._frame_note_var.get())
+        self.assertTrue(self.setup.full_button.instate(["disabled"]))
         self.select_area()
         self.setup.refresh_and_check_area()
         self.jobs.jobs[-1].result = JobResult(frame=frame(region_kind="window-unverified", content_verified=False))
         self.setup._poll_job(self.setup._job_token)
-        self.assertIn("includes window frame", self.setup._frame_note_var.get())
+        self.assertIsNone(self.setup._calibration)
+        self.assertIsNone(self.setup._snapshot)
+        self.assertIsNone(self.setup._selection)
+        self.assertIn("Fresh area check failed", self.setup._status_var.get())
         self.assertTrue(self.setup.full_button.instate(["disabled"]))
 
     def test_cancel_target_change_and_late_result_clear_geometry(self):
