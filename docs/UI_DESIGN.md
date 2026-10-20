@@ -1,0 +1,33 @@
+# Desktop UI direction
+
+Authority: [intent.md](../intent.md). Product roadmap: [BUILD.md](../BUILD.md). On October 20, 2026, the owner selected “Dark launcher — violet/cyan, bold game cards” and requested multiple games with previews and cards. This replaces the earlier cream/green direction.
+
+Open [the interactive desktop design](design/index.html). It works offline and uses local artwork and system fonts. It has no game connection, native input, capture, SDK calls, accounts, or telemetry. A permanent design ribbon identifies simulated states. The full launcher remains a design artifact; current downloadable binaries use the existing Python/Tk interface.
+
+## Game library
+
+Start on Home with a large featured Adopt Me cover and a grid of distinct game cards. Library provides the full catalog. Each card has original preview artwork, game name, genre, support badge, and one clear action. Keep the owner's tagline: “Helping kids touch grass by automating their games.”
+
+The initial design includes Adopt Me, Bee Swarm Simulator, and Blox Fruits. Adopt Me exposes the current input-check workspace and marks care routines as unverified. The other two are proposed profiles, explicitly marked as not supported yet; they expose details but cannot start input. Their inclusion does not commit to gameplay automation or establish permission under any game's rules. An unavailable Add Game card communicates future extensibility without accepting arbitrary executable packs.
+
+Artwork is original concept illustration, not an official logo, game screenshot, or evidence of a working preview. The files and exact image-generation prompts live in [design/assets](design/assets/) and [design/asset-prompts.txt](design/asset-prompts.txt).
+
+Each selected game owns its setup instructions, routine availability, pack compatibility, and preview state. Switching games clears binding, access readiness, gameplay acknowledgment, progress, and any captured preview. A cleanup-failure block belongs to the application and survives game changes. No selection, card, image, or recognition result authorizes input.
+
+## Workspace and states
+
+Navigation contains Library, Session, Setup, Routines, Packs, and Settings. Session shows the selected game, routine, current input step, readiness, preview, and the existing 30-second supervised limit. Setup keeps manual sign-in, window selection, access checks, and routine selection distinct. No credentials form, focus stealing, or automatic Resume.
+
+Dry run remains the default. Live input requires fresh setup and manual gameplay acknowledgment. Focus loss clears live readiness and requires setup again. Stopping blocks a new run while release is in progress. Cleanup failure remains latched until the application is restarted after manual input-state checks. Future recognition states and care routines stay labelled as unavailable. No fictional task completions, reward counts, potion progress, or elapsed-time success claims appear.
+
+Settings shows the dark appearance, privacy boundary, session limit, and cleanup state. Permission management and the optional synthetic SDK check belong to the native Recognition Setup component and are not simulated as working launcher controls. Keep process IDs, raw JSON, SDK configuration, and developer diagnostics out of the primary flow. Real window previews remain separate from promotional card artwork and must state whether content bounds are verified.
+
+## Visual and accessibility rules
+
+Use a near-black canvas, layered navy panels, violet primary actions, cyan highlights, large artwork, and restrained glow. Reference tokens: canvas `#0B0C13`, panel `#151725`, raised panel `#20233A`, text `#F5F6FF`, muted text `#A9AEC6`, violet `#8E5BF0`, cyan `#50DBF7`. Button text and hover states must meet AA contrast. Status always has text, not color alone.
+
+Reference desktop width is 1240 px. Navigation contracts on narrower windows and cards stack without overlapping controls. The design ribbon and global Stop stay visible when content scrolls. The navigation body scrolls independently with Stop pinned at the bottom, including short windows and 200% scaling. Preserve visible keyboard focus, accessible names, reduced-motion support, Escape and Cmd/Ctrl+. for Stop, and Cmd/Ctrl+, for Settings.
+
+## Integration boundary
+
+The Python/Tk input engine remains the only native action path. A separate no-input Recognition Setup component provides the first native capture/SDK surface; the launcher design does not replace that boundary. Game-specific automation requires reviewed profiles, supported screen states, calibration, guarded actions, and native outcome evidence before a card can advertise it as supported. Current care routines, pack installation, longer sessions, assistive-technology acceptance, and hardware verification remain open in [plan.md](../plan.md).

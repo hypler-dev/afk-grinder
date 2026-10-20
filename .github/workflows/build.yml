@@ -87,6 +87,12 @@ jobs:
           'import faulthandler, runpy; faulthandler.dump_traceback_later(60, exit=True);
           runpy.run_path("tools/smoke_ui.py", run_name="__main__")'
 
+      - name: Smoke-test recognition setup with fake frames only
+        run: >-
+          uv run --locked --extra build --extra recognition python -c
+          'import faulthandler, runpy; faulthandler.dump_traceback_later(60, exit=True);
+          runpy.run_path("tools/smoke_recognition_ui.py", run_name="__main__")'
+
       - name: Check local SDK without screen capture or input
         run: uv run --locked --extra build --extra recognition python -m afk_grinder --sdk-check
 

@@ -1,0 +1,66 @@
+# Game preview card illustrations
+
+Tool mode: built-in `image_gen` default generation mode; transparent background disabled.
+
+## pet-world.png
+
+Generated original: `/Users/jeff/.codex/generated_images/01a1588e-b3e9-7780-bd52-09d34f2124f4/exec-8525de5b-fcf3-4c94-8bd0-817fd9ce2283.png`
+
+Final path: `docs/design/assets/pet-world.png`
+
+Prompt:
+
+```text
+Use case: stylized-concept
+Asset type: polished game launcher preview-card cover art
+Primary request: Original pet-care fantasy game cover illustration. An adorable cream cube-shaped puppy and a mint-green cat are the friendly heroes in a whimsical pet-care village on a floating island. Build a lush, playful miniature world with cozy homes, paths, trees, flowers, and tiny care stations; premium colorful stylized 3D video game key art with strong depth, crisp material detail, cinematic rim lighting, and vivid atmospheric perspective.
+Scene/backdrop: purple twilight sky and cyan-blue magical illumination around a floating island village.
+Subject: the original cream cube puppy and original mint cat, grouped on the right side of frame, joyful and expressive.
+Style/medium: premium stylized 3D game concept art, sharp polished render, colorful character art; no flat SaaS illustration.
+Composition/framing: wide 16:9, deeply layered landscape, subjects on right, intentionally dark violet left third as clean negative copy space for CSS overlay; may be cropped with object-fit.
+Lighting/mood: purple-twilight cinematic glow, cyan rim lights, warm playful lantern accents.
+Color palette: dark violet, cyan, mint, cream, colorful garden tones.
+Constraints: original concepts only. Game cover art only. No coins, loot boxes, purchases, gambling, violence, branded characters, recognizable game assets, text, logos, watermark, HUD, buttons, labels, or UI.
+```
+
+## bee-fields.png
+
+Generated original: `/Users/jeff/.codex/generated_images/01a1588e-b3e9-7780-bd52-09d34f2124f4/exec-c2dae313-a953-45bc-93f2-ba80ece2adcd.png`
+
+Final path: `docs/design/assets/bee-fields.png`
+
+Prompt:
+
+```text
+Use case: stylized-concept
+Asset type: polished game launcher preview-card cover art
+Primary request: Original bee-field collection-adventure game cover illustration. Friendly round bumblebees fly and hover over a honey-gold wildflower field with tiny charming beehives. Create a rich whimsical gathering-adventure world with colorful flowers, pollen trails, layered grass and hills; premium colorful stylized 3D video game key art with strong depth, crisp material detail, cinematic rim lighting, and vivid atmospheric perspective.
+Scene/backdrop: enchanted honey-gold wildflower field with a purple and cyan magical sky.
+Subject: several original round friendly bees, with the largest two on the right side of frame; tiny beehives further into the field.
+Style/medium: premium stylized 3D game concept art, sharp polished render, colorful character art; no flat SaaS illustration.
+Composition/framing: wide 16:9, deep layered field, hero bees on right, intentionally dark violet left third as clean negative copy space for CSS overlay; may be cropped with object-fit.
+Lighting/mood: enchanted sunset-twilight mood, cyan rim lighting, golden field glow.
+Color palette: dark violet, cyan, honey-gold, warm orange, wildflower colors.
+Constraints: original concepts only. Game cover art only. No specific game assets, no coins, loot boxes, purchases, gambling, violence, branded characters, text, logos, watermark, HUD, buttons, labels, or UI.
+```
+
+## ocean-adventure.png
+
+Generated original: `/Users/jeff/.codex/generated_images/01a1588e-b3e9-7780-bd52-09d34f2124f4/exec-33cd0050-0f5c-4fc2-8d64-d31812a436fa.png`
+
+Final path: `docs/design/assets/ocean-adventure.png`
+
+Prompt:
+
+```text
+Use case: stylized-concept
+Asset type: polished game launcher preview-card cover art
+Primary request: Original fantastical island adventure game cover illustration. Sleek friendly sailboat travels amid tropical islands and fruit groves across clear teal water; magical magenta and blue horizons, lush palms, playful cliffs, glowing coves, and distant floating clouds. Premium colorful stylized 3D video game key art with strong depth, crisp materials, cinematic rim lighting, vivid atmospheric perspective, and a sense of joyful exploration.
+Scene/backdrop: tropical archipelago, teal water, fruit groves, magenta-blue horizon at twilight.
+Subject: an original sleek sailboat placed on the right side of frame, with islands and fruit groves behind it.
+Style/medium: premium stylized 3D game concept art, sharp polished render, colorful adventure art; no flat SaaS illustration.
+Composition/framing: wide 16:9, cinematic ocean depth, sailboat on right, intentionally dark violet left third as clean negative copy space for CSS overlay; may be cropped with object-fit.
+Lighting/mood: dramatic twilight with cyan and magenta rim lights, warm island glow.
+Color palette: dark violet, cyan, teal water, magenta, electric blue, tropical fruit colors.
+Constraints: original concepts only. Game cover art only. No weapons, violence, branded characters, recognizable game assets, text, logos, watermark, HUD, buttons, labels, or UI.
+```

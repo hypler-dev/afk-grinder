@@ -1,0 +1,228 @@
+"""Disposable capture/SDK processes with memory-only, bounded frame IPC.
+
+The UI polls a queue. Native calls, pipe reads and process teardown never run
+on Tk's event thread. Messages contain JSON and BGR bytes, not pickled results.
+"""
+
+from dataclasses import dataclass
+import json
+import math
+import multiprocessing
+from multiprocessing.connection import Connection
+import queue
+import sys
+import threading
+import time
+from typing import Any
+
+from afk_grinder.models import Target
+from . import CapturedWindow
+
+MAX_FRAME_BYTES = 16_000_000 * 3
+MAX_HEADER_BYTES = 16_384
+
+
+@dataclass(frozen=True)
+class JobResult:
+    frame: CapturedWindow | None = None
+    report: dict[str, Any] | None = None
+    error: str = ""
+
+
+def _worker(connection: Connection, operation: str, target: Target | None,
+            start_gate: Any, deadline: float) -> None:
+    """Only fixed application operations are accepted; no plugins or pipelines."""
+    try:
+        # A child may boot before Process.start returns a signalable handle.
+        # Do not import or touch native APIs until the parent grants this gate.
+        if not start_gate.wait(timeout=max(0, deadline - time.monotonic())):
+            return
+        if time.monotonic() >= deadline:
+            return
+        if operation == "capture" and target is not None and target.is_roblox:
+            if sys.platform == "darwin":
+                from .macos import MacOSCapture
+
+                backend = MacOSCapture()
+            elif sys.platform == "win32":
+                from .windows import WindowsCapture
+
+                backend = WindowsCapture()
+            else:
+                raise RuntimeError("Window capture requires Windows or macOS.")
+            frame = backend.snapshot(target)
+            header = {"kind": "frame", "window_id": frame.window_id,
+                      "native_rect": frame.native_rect, "physical_size": frame.physical_size,
+                      "monitor_id": frame.monitor_id, "scale": frame.scale,
+                      "captured_at": frame.captured_at, "region_kind": frame.region_kind,
+                      "content_verified": frame.content_verified}
+            connection.send_bytes(json.dumps(header, allow_nan=False).encode("utf-8"))
+            connection.send_bytes(frame.pixels)
+        elif operation == "sdk":
+            from afk_grinder.recognition.maa_adapter import probe_sdk
+
+            report = probe_sdk()
+            connection.send_bytes(json.dumps({"kind": "sdk", "report": report}, allow_nan=False).encode("utf-8"))
+        else:
+            raise ValueError("Unsupported observation operation.")
+    except Exception as error:
+        try:
+            connection.send_bytes(json.dumps({"kind": "error", "error": str(error)[:500]}).encode("utf-8"))
+        except (OSError, EOFError, BrokenPipeError):
+            pass
+    finally:
+        connection.close()
+
+
+def _read_result(connection: Connection, operation: str, target: Target | None) -> JobResult:
+    header = json.loads(connection.recv_bytes(MAX_HEADER_BYTES).decode("utf-8"))
+    if not isinstance(header, dict):
+        raise ValueError("Invalid observation header.")
+    if header.get("kind") == "error":
+        message = header.get("error")
+        if not isinstance(message, str) or len(message) > 500:
+            raise ValueError("Invalid observation error.")
+        return JobResult(error=message)
+    if operation == "sdk" and header.get("kind") == "sdk":
+        report = header.get("report")
+        if not isinstance(report, dict) or report.get("native_input") is not False:
+            raise ValueError("Invalid SDK observation report.")
+        return JobResult(report=report)
+    if operation != "capture" or target is None or header.get("kind") != "frame":
+        raise ValueError("Unexpected observation operation result.")
+    expected = {"kind", "window_id", "native_rect", "physical_size", "monitor_id", "scale",
+                "captured_at", "region_kind", "content_verified"}
+    if set(header) != expected:
+        raise ValueError("Unexpected frame metadata.")
+    for field in ("window_id", "monitor_id"):
+        if not isinstance(header[field], str) or not 0 < len(header[field]) <= 128:
+            raise ValueError("Invalid capture identity.")
+    frame = CapturedWindow(target=target, window_id=header["window_id"],
+                          native_rect=tuple(header["native_rect"]),
+                          physical_size=tuple(header["physical_size"]), monitor_id=header["monitor_id"],
+                          scale=tuple(header["scale"]), pixels=connection.recv_bytes(MAX_FRAME_BYTES),
+                          format="BGR8", captured_at=header["captured_at"],
+                          region_kind=header["region_kind"], content_verified=header["content_verified"])
+    return JobResult(frame=frame)
+
+
+class BackgroundJob:
+    """One cancellable native observation with an outer process deadline.
+
+    ``poll`` is nonblocking and returns one result at most. Cancel/Close drops
+    queued and late results immediately; process cleanup runs off the UI thread.
+    """
+
+    def __init__(self, operation: str, target: Target | None = None, *, timeout: float = 15.0,
+                 _context: Any = None):
+        if operation not in {"capture", "sdk"}:
+            raise ValueError("Only capture or SDK diagnostics are supported.")
+        if operation == "capture" and (target is None or not target.is_roblox):
+            raise ValueError("An explicitly bound Roblox process is required.")
+        if not math.isfinite(timeout) or not 0 < timeout <= 15:
+            raise ValueError("Observation deadline must be at most 15 seconds.")
+        self._deadline = time.monotonic() + timeout
+        self._finished = False
+        self._cancelled = threading.Event()
+        self._result_lock = threading.Lock()
+        self._cleanup_lock = threading.Lock()
+        self._results: queue.Queue[JobResult] = queue.Queue(maxsize=1)
+        context = _context or multiprocessing.get_context("spawn")
+        reader, writer = context.Pipe(duplex=False)
+        self._reader = reader
+        self._start_gate = context.Event()
+        self._process = context.Process(target=_worker,
+                                        args=(writer, operation, target, self._start_gate, self._deadline),
+                                        daemon=True)
+        self._thread = threading.Thread(target=self._launch, args=(writer, operation, target), daemon=True)
+        self._thread.start()
+
+    def _launch(self, writer: Connection, operation: str, target: Target | None) -> None:
+        try:
+            self._process.start()
+        except Exception:
+            self._reader.close()
+            self._publish(JobResult(error="Could not start preview or SDK check. No input was sent."))
+        else:
+            writer.close()
+            with self._result_lock:
+                permitted = not self._cancelled.is_set() and time.monotonic() < self._deadline
+                if permitted:
+                    self._start_gate.set()
+            if not permitted:
+                self._terminate()
+            else:
+                self._read(operation, target)
+        finally:
+            writer.close()
+
+    @property
+    def done(self) -> bool:
+        with self._result_lock:
+            return self._finished
+
+    def _publish(self, result: JobResult) -> None:
+        with self._result_lock:
+            if not self._cancelled.is_set():
+                self._results.put_nowait(result)
+
+    def _read(self, operation: str, target: Target | None) -> None:
+        try:
+            result = _read_result(self._reader, operation, target)
+            # Do not publish success until native destructors have exited too.
+            self._process.join(timeout=max(0, self._deadline - time.monotonic()))
+            if self._process.is_alive():
+                raise TimeoutError("Observation process did not finish before its deadline.")
+            if self._process.exitcode != 0:
+                raise RuntimeError("Observation process exited unsuccessfully.")
+        except Exception:
+            result = JobResult(error="Preview or SDK check failed. No input was sent.")
+        finally:
+            self._reader.close()
+            if self._process.is_alive():
+                self._terminate()
+        self._publish(result)
+
+    def poll(self) -> JobResult | None:
+        with self._result_lock:
+            if self._finished:
+                return None
+            timed_out = time.monotonic() >= self._deadline
+            if not timed_out:
+                try:
+                    result = self._results.get_nowait()
+                except queue.Empty:
+                    return None
+                self._finish_locked()
+                return result
+            self._finish_locked()
+        threading.Thread(target=self._terminate, daemon=True).start()
+        return JobResult(error="Preview or SDK check timed out. No input was sent.")
+
+    def _finish_locked(self) -> None:
+        self._finished = True
+        self._cancelled.set()
+        while True:
+            try:
+                self._results.get_nowait()
+            except queue.Empty:
+                break
+
+    def cancel(self) -> None:
+        with self._result_lock:
+            if self._finished:
+                return
+            self._finish_locked()
+        threading.Thread(target=self._terminate, daemon=True).start()
+
+    def _terminate(self) -> None:
+        with self._cleanup_lock:
+            try:
+                if self._process.is_alive():
+                    self._process.terminate()
+                    self._process.join(timeout=0.2)
+                if self._process.is_alive():
+                    self._process.kill()
+                    self._process.join(timeout=0.2)
+            finally:
+                self._reader.close()

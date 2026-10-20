@@ -196,7 +196,7 @@ Authority: accepted intent.md and the owner-supplied BUILD.md. The owner explici
 | 4 | Additional independently verified indoor tasks and bounded recovery | Pending |
 | 5 | Curated signed pack update provenance, validation, rollback | Pending |
 | 6 | Opt-in longer sessions after native soak/performance evidence | Pending |
-| Later | Verified location navigation, other games, optional companion | Deferred by blueprint |
+| Later | Verified location navigation, other games, optional companion | Game-library design opened by owner; other-game automation and companion remain deferred |
 
 The full goal remains active until the accepted roadmap is implemented and proved at its stated scope. Native Roblox movement/Escape/held-key proof from the earlier supervised attempt remains pending; never infer it from CI or read-only focus probes. No new live game input is authorized by a timer or recognition result alone. No purchases, trades, credentials, injection, shell routines, or arbitrary plugins.
 
@@ -222,3 +222,59 @@ The full goal remains active until the accepted roadmap is implemented and prove
 - Related work in progress: separate native GPT/Sol fallback worker owns `src/afk_grinder/capture/{__init__,macos,windows}.py` and `tests/test_capture_backends.py`; fresh read-only capture review is pending. Mac raw-window previews are explicitly unverified content bounds; Windows uses client-only PrintWindow. Neither has native hardware/capture acceptance yet. No capture UI, task packs, care actions, signed updates or longer sessions are enabled by this foundation.
 - Foundation integration review: fresh native GPT/Sol read-only reviewer reports PASS, no P1/P2/P3 after the embedded-module guard fix; independently inspected the real Mac bundle's 230-module frozen index with no Maa implementation. The separate capture review identified explicit SCK output sizing and per-pixel conversion memory issues; those uncommitted capture files remain with their worker for repair and follow-up review, outside the foundation commit.
 - Foundation committed/pushed as `dd767bbe993ba361d17f5428dab329333e8c080c`. GitHub confirms public visibility and MIT detection. [Run 39393844904](https://github.com/hypler-dev/afk-grinder/actions/runs/39393844904) passed both Mac targets, including source/frozen SDK diagnostics, SDK-free rebuild and artifact upload. Windows stopped at a test fixture comparing CRLF bytes against an LF literal; no Windows SDK check or artifact upload ran. The correction compares archived bytes with original source bytes and adds `.gitattributes` plus a 95-notice hash test to prevent checkout normalization of upstream texts. A fresh all-target run is required; no Windows success is claimed from the first run.
+
+### All-platform SDK foundation receipt
+
+- The newline/notice correction was committed and pushed as `8d3641cd2ef7631fe0d89b8c115b826f8532b761`. [Run 39394583486](https://github.com/hypler-dev/afk-grinder/actions/runs/39394583486) passed Windows x64, macOS arm64, and macOS x64, including source/frozen SDK diagnostics, SDK-free rebuild, packaged checks, and test-artifact uploads.
+- All three artifacts were downloaded and inspected. Outer checksums, exact embedded/external source metadata, architecture, root MIT license, all 95 notice hashes, Mac executable modes, and frozen module inventories passed. No Maa/MaaAgentBinary implementation was present. Artifact IDs: Windows `12251670754`, Mac arm64 `12251630966`, Mac x64 `12250868681`; these are retained test bundles, not installers or signed releases.
+- Archive SHA-256: Windows `f04630d02388da3600a7aefd890bfe0c74fadd1d01a53f43911923e88f4c19ba`; Mac arm64 `53fbb74de60294fd494ad9aba6d0eb9a5c22f16fce1d6709818680f4ccd919cf`; Mac x64 `a0f54c7e6deaa36b063bc548dea3e6c2de618aa76ab4bcd23942155c5432d96e`. Local receipt: `/private/tmp/afk-grinder-foundation-ci-39394583486/VERIFICATION.json` (temporary, not source-controlled).
+
+### Capture, pack, and launcher work in progress
+
+- Scope: no-input native preview/capture service and strict local resource-pack validation. The owner additionally accepted a dark violet/cyan launcher with bold game previews/cards and multiple game workspaces; [docs/UI_DESIGN.md](docs/UI_DESIGN.md) records that design. It is a separate offline HTML deliverable, not an implemented native shell. Adopt Me remains the first input-check profile; other cards remain explicitly unsupported.
+- Capture adapter producer: native GPT/Sol fallback; fresh native GPT `gpt_reviewer` (OpenAI Terra xhigh) review passed after explicit SCK output-size and conversion-memory repairs. Thirteen fake native-adapter tests pass. No actual window capture or calibration acceptance is claimed.
+- Native preview producer: `gpt_worker` (OpenAI Terra high), controller service/integration: GPT/Sol. Review found synchronous process startup and non-atomic queued-frame discard; fixes move startup off Tk and serialize result publication/cancellation. Twelve service checks include blocked startup, late child cleanup, queued/late result disposal, malformed IPC, and deadline behavior. A closed child gate prevents native work until the parent has a signalable handle; expired/ungranted workers exit before importing native APIs. OS process-creation stalls may delay bootstrap cleanup, not authorize native work. A real spawned SDK service check passes with synthetic pixels only. Fresh `gpt_reviewer` (OpenAI Terra xhigh) follow-up PASS, no P1/P2/P3 findings.
+- Restricted pack producer: `gpt_worker` (OpenAI Terra high); fresh `gpt_reviewer` (OpenAI Terra xhigh) final review PASS after bounded-file, pinned-root, numeric-overflow and PNG-validation fixes. Fourteen pack checks pass. Loader has no recognition/input/update path; held-out fixtures and signed pack distribution remain open.
+- Native GUI evidence: ten fake-input integration checks and eight fake-frame Recognition Setup checks pass. CI now runs both GUI suites. Local Mac arm64 SDK-free and private SDK-bearing builds pass; their frozen checks include actual spawned SDK-service/gate/pipe startup in the no-input UI smoke. The SDK-free smoke accepts only the exact optional-SDK-absent result; unexpected errors and early close fail. No capture or game input occurs. The default SDK-free bundle was restored after private verification. New all-target CI remains pending; the successful `8d3641c` artifacts above predate this native preview integration.
+- Final source validation at this snapshot: 110 unit checks pass, compilation passes, and tracked plus explicitly checked untracked text has no whitespace errors. Native capture, calibration anchors, held-out game fixtures, actual Roblox movement/focus-loss/Escape cleanup, signed pack updates, and longer-session gates remain open.
+- Privacy gate: host read-only preflight found one Roblox player and no Screen Recording grant. No permission prompt, game screenshot, diagnostic file, native input, or account-data transfer occurred. Existing Accessibility/Input Monitoring grants do not establish the new capture permission.
+- Launcher producer: `gpt_worker` (OpenAI Terra high). Three original 1672×941 covers were generated using built-in image generation, inspected, and copied byte-for-byte; exact prompts and paths are in `docs/design/asset-prompts.txt`. No official game artwork, game captures, or children's photos were used. Fresh independent `gpt_ui_review` (OpenAI Terra xhigh) final PASS after dry/live readiness, focus-recovery, per-run acknowledgment, AA contrast, shortcut, reflow and ARIA repairs; no P1/P2/P3 findings. The owner accepted the direction; the reviewed design artifact is implemented, while native launcher integration remains pending.
+- Root launcher browser QA passes: initial dry run without setup; supported live arming; consumed acknowledgment blocks immediate restart; focus loss clears setup and fresh binding/preview/access/ack recovers; cleanup latch survives changing games; unsupported profile Start remains disabled; Cmd+. stops and Cmd+, opens Settings. Logical 620×450 and 320×450 layouts have no horizontal content overflow and both global Stop controls fit. A 1240×900 screenshot is retained at `docs/design/library-dark.jpg`; temporary browser viewport overrides were reset. HTML/JavaScript syntax and untracked text whitespace checks pass. This is design QA, not native assistive-technology or gameplay proof.
+- Other-provider UI review routing was checked against official Z.AI documentation, but the pinned resolver stopped with `glm-secure: registry timestamp stale/future`. No GLM payload or provider contact occurred; no model/registry was changed. Native independent review is the fallback. No Spark lane was used.
+- New Mac ScreenCaptureKit/CoreMedia 12.2.2 bindings identify MIT. Their pinned upstream notices were fetched independently and byte-match the retained common PyObjC notice; [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) records the hash. The actual restored default Mac bundle passes the SDK publication guard. SDK-bearing output remains private and was overwritten after diagnosis.
+
+### Changed paths for this slice
+
+```text
+.github/workflows/build.yml
+README.md
+intent.md
+plan.md
+spec.md
+pyproject.toml
+uv.lock
+docs/DEPENDENCIES.md
+docs/UI_DESIGN.md
+docs/design/index.html
+docs/design/library-dark.jpg
+docs/design/asset-prompts.txt
+docs/design/assets/pet-world.png
+docs/design/assets/bee-fields.png
+docs/design/assets/ocean-adventure.png
+src/afk_grinder/__main__.py
+src/afk_grinder/ui.py
+src/afk_grinder/ui_recognition.py
+src/afk_grinder/capture/__init__.py
+src/afk_grinder/capture/macos.py
+src/afk_grinder/capture/windows.py
+src/afk_grinder/capture/service.py
+src/afk_grinder/recognition/packs.py
+tests/test_capture_backends.py
+tests/test_capture_service.py
+tests/test_packs.py
+tools/build.py
+tools/smoke_ui.py
+tools/smoke_recognition_ui.py
+```
+
+No unrelated working-tree changes observed. Generated `.venv/`, `build/`, `dist/`, and prior downloaded test artifacts remain outside the source slice. No login automation, account-data transfer, native game input, Screen Recording permission grant, diagnostic screenshot file, signing credential, deploy, or public binary release occurred.

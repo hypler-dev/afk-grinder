@@ -50,6 +50,7 @@ class App:
         self._close_error_acknowledged = False
         self._log_lines: list[str] = []
         self._readiness_ok = False
+        self._recognition_setup = None
 
         self.mode_var = tk.StringVar(master=root, value="dry")
         self.confirm_var = tk.BooleanVar(master=root, value=False)
@@ -60,6 +61,7 @@ class App:
         self._workflow: Workflow | None = None
 
         self._build()
+        self._build_menu()
         self.mode_var.trace_add("write", self._on_mode_change)
         self.confirm_var.trace_add("write", self._on_confirmation_change)
         self._load_default()
@@ -181,6 +183,47 @@ class App:
         self.editor.insert("1.0", DEFAULT_TEMPLATE)
         self.editor.edit_modified(False)
         self._validate()
+
+    def _build_menu(self) -> None:
+        menu = tk.Menu(self.root)
+        tools = tk.Menu(menu, tearoff=False)
+        tools.add_command(label="Recognition setup…", command=self._open_recognition_setup,
+                          accelerator="Cmd+Shift+R" if sys.platform == "darwin" else "Ctrl+Shift+R")
+        tools.add_command(label="Capture Roblox preview", command=self._capture_preview)
+        tools.add_command(label="Cancel preview work", command=self._cancel_preview_work)
+        tools.add_separator()
+        tools.add_command(label="Stop input", command=self._stop)
+        menu.add_cascade(label="Tools", menu=tools)
+        self.root.configure(menu=menu)
+        modifier = "Command" if sys.platform == "darwin" else "Control"
+        self.root.bind(f"<{modifier}-Shift-R>", lambda event: self._open_recognition_setup())
+
+    def _preview_open(self) -> bool:
+        return self._recognition_setup is not None and not self._recognition_setup._closed
+
+    def _open_recognition_setup(self) -> None:
+        if self._run_locked or self.runner.running or self._closing:
+            self.status_var.set("Stop the input check before opening recognition setup.")
+            return
+        if self._preview_open():
+            self._recognition_setup.window.lift()
+            return
+        from .ui_recognition import RecognitionSetup
+
+        self._recognition_setup = RecognitionSetup(
+            self.root, get_target=lambda: self.target, begin_binding=self._begin_binding,
+            cancel_binding=self._cancel_binding, binding_pending=lambda: self._binding_after is not None,
+            input_busy=lambda: self._run_locked or self.runner.running or self._closing,
+        )
+
+    def _capture_preview(self) -> None:
+        self._open_recognition_setup()
+        if self._preview_open():
+            self._recognition_setup.capture_preview()
+
+    def _cancel_preview_work(self) -> None:
+        if self._preview_open():
+            self._recognition_setup.cancel_work()
 
     def _on_editor_modified(self, _event: tk.Event[tk.Misc] | None = None) -> None:
         if not self.editor.edit_modified():
@@ -334,6 +377,9 @@ class App:
         return f"{fallback}: {detail[:240]}"
 
     def _start(self) -> None:
+        if self._preview_open():
+            self.status_var.set("Close recognition setup before starting an input check.")
+            return
         if self._run_locked or self._binding_after is not None:
             if self._binding_after is not None:
                 self.status_var.set("Wait for binding to finish or press Stop to cancel it.")
@@ -431,6 +477,8 @@ class App:
         self.log.configure(state="disabled")
 
     def _on_close(self) -> None:
+        if self._preview_open():
+            self._recognition_setup.close()
         self._cancel_binding(silent=True)
         if self.runner.running:
             self._closing = True
@@ -470,6 +518,8 @@ class App:
         self._destroy()
 
     def _destroy(self) -> None:
+        if self._preview_open():
+            self._recognition_setup.close()
         if self._binding_after is not None:
             self._cancel_binding(silent=True)
         if self._validation_after is not None:

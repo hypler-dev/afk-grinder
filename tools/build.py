@@ -42,7 +42,7 @@ def main() -> None:
         command += ["--osx-bundle-identifier", "com.hypler.afkgrinder"]
         # Native modules load lazily via importlib so dry run stays portable.
         # Explicit collection is needed for the frozen app's permission checks.
-        for module in ("AppKit", "Quartz", "ApplicationServices", "objc"):
+        for module in ("AppKit", "Quartz", "ApplicationServices", "ScreenCaptureKit", "objc"):
             command += ["--hidden-import", module]
     command.append(str(root / "tools" / "launch.py"))
     environment = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(root / "build" / "pyinstaller-cache"))

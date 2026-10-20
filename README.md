@@ -8,7 +8,7 @@ A free, MIT-licensed Windows/macOS application in development for local Roblox a
 
 **Current state:** prototype with deterministic keyboard/mouse playback, foreground process binding, cancellation, and emergency-stop checks. Automated builds provide Windows x64 and macOS Apple Silicon/Intel test bundles. The bundled template tests movement controls; it does not complete Adopt Me tasks. Live Roblox compatibility, representative player hardware, and production installers are not yet validated.
 
-**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. Window-only, in-memory visual recognition is being added against the blueprint; the input prototype does not capture screenshots.
+**No runtime LLM, cloud inference, API key, login automation, credential storage, or action recording.** Roblox sign-in stays manual. The input path does not capture screenshots. A separate opt-in Recognition Setup preview foundation keeps window frames in memory; native capture and game recognition acceptance remain pending.
 
 ## License and use at your own risk
 
@@ -21,6 +21,14 @@ The software is provided **as is, without warranty**. The authors and contributo
 I built this for my kids because I wanted them to go outside. This is a fun family project aimed at spending less time on repetitive game chores and more time outdoors.
 
 This is an experimental family project. The current prototype is for short, supervised input tests; unattended gameplay is not ready yet.
+
+## Game library design
+
+The [interactive launcher design](docs/design/index.html) uses a dark violet/cyan theme, original preview artwork, and separate game cards for Adopt Me, Bee Swarm Simulator, and Blox Fruits. Adopt Me is the first input-check profile; the other cards are proposed profiles labelled **Not supported yet**. Switching games clears setup and live arming. The design runs offline and sends no game input.
+
+![Dark launcher design with original preview cards for Adopt Me, Bee Swarm Simulator, and Blox Fruits. This is a simulated design, not the native application.](docs/design/library-dark.jpg)
+
+This is a visual prototype, separate from the current Python/Tk test binaries. [UI direction and state rules](docs/UI_DESIGN.md) describe the native integration boundary and support gates.
 
 ## Run from source
 
@@ -72,6 +80,8 @@ uv run --locked --extra build --extra recognition python -m afk_grinder --sdk-ch
 This checks MaaFw 5.14.3 with synthetic pixels only, CPU configuration, privacy settings, a controller that rejects input, and cancellation. It captures no windows and performs no gameplay actions. The diagnostic runs in a disposable process with a 15-second deadline. No LLM is needed.
 
 CI is configured to verify SDK loading in source and frozen applications on all three desktop targets, then rebuild the downloadable prototype without the optional SDK. SDK-bearing artifact publication remains blocked until its source/notice distribution audit is complete. [Dependency evidence](docs/DEPENDENCIES.md) tracks this work.
+
+In the source application, **Tools → Recognition setup** opens the no-input preview surface. Select the Roblox window explicitly, then request a single preview. macOS capture requires macOS 14+ and Screen Recording permission for the application identity; access is never requested silently. Mac window content bounds are currently labelled unverified. Preview and SDK checks never enable care routines or bypass input safeguards. Cancel or close the modal to discard its snapshot before returning to input controls.
 
 ## First supervised test
 

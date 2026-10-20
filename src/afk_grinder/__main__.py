@@ -7,6 +7,9 @@ import sys
 
 
 def main() -> None:
+    from multiprocessing import freeze_support
+
+    freeze_support()
     parser = argparse.ArgumentParser(description="AFK Grinder supervised desktop prototype")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="Print native readiness without sending input")
@@ -77,21 +80,43 @@ def main() -> None:
     configure_tk()
     if args.ui_smoke:
         import tkinter as tk
+        from .capture.service import BackgroundJob
         from .ui import App
 
         root = tk.Tk()
         app = App(root, backend=None)
+        job = BackgroundJob("sdk")
+        failure = []
+        probe_complete = False
+
+        def finish_probe() -> None:
+            nonlocal probe_complete
+            result = job.poll()
+            if result is None:
+                root.after(20, finish_probe)
+                return
+            missing_optional_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
+            if not missing_optional_sdk and (result.error or result.report is None):
+                failure.append("Spawned recognition service failed its no-input smoke check.")
+            probe_complete = True
+            app._on_close()
+
         try:
-            root.after(200, app._on_close)
+            root.after(20, finish_probe)
             root.mainloop()
         finally:
+            job.cancel()
             app.runner.stop()
             app.runner.join()
             try:
                 root.destroy()
             except tk.TclError:
                 pass
-        print("Dry-run UI startup passed. No native backend or OS input used.")
+        if not probe_complete or failure:
+            if sys.stderr is not None:
+                print(failure[0] if failure else "UI closed before observation smoke completed.", file=sys.stderr)
+            sys.exit(1)
+        print("Dry-run UI and spawned SDK-service startup passed. No OS input or capture used.")
         return
     from .ui import main as open_ui
 

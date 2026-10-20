@@ -109,6 +109,28 @@ class UISmoke(unittest.TestCase):
         self.assertIsNone(self.app._binding_after)
         self.assertEqual(self.backend.calls, [])
 
+    def test_preview_setup_blocks_input_start_without_changing_mode(self):
+        self.app._open_recognition_setup()
+        self.root.update()
+        self.assertTrue(self.app._preview_open())
+        self.app._start()
+        self.assertFalse(self.app.runner.running)
+        self.assertEqual(self.app.mode_var.get(), "dry")
+        self.assertEqual(self.backend.calls, [])
+        self.app._recognition_setup.close()
+        self.assertFalse(self.app._preview_open())
+
+    def test_preview_cannot_open_during_input_and_closes_with_app(self):
+        self.app._run_locked = True
+        self.app._open_recognition_setup()
+        self.assertFalse(self.app._preview_open())
+        self.app._run_locked = False
+        self.app._open_recognition_setup()
+        preview = self.app._recognition_setup
+        self.app._on_close()
+        self.assertTrue(preview._closed)
+        self.assertEqual(self.backend.calls, [])
+
     def test_countdown_stop_keeps_terminal_status(self):
         self.app._start()
         self.assertTrue(self.app.start_button.instate(["disabled"]))

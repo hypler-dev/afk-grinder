@@ -58,6 +58,20 @@ The tracker clears calibration after capture failure, stale/future/out-of-order 
 
 ## Compatibility and migration
 
+### Native preview and restricted pack foundations
+
+Tools → Recognition setup opens a separate no-input modal. It reuses explicit Roblox binding, can request one window-only preview, and can check the optional SDK using synthetic pixels. Opening it blocks input Start; it cannot open during an input run. Cancel, Escape, target change, and Close clear the displayed snapshot and reject late results. No screenshot is written to disk. The modal never establishes calibrated anchors, gameplay readiness, or permission to act.
+
+Capture and SDK operations run in disposable spawned processes with a 15-second operation deadline. Process startup, pipe reads, native teardown, and termination run away from Tk's event thread. A closed child start gate permits no native imports or capture until the parent has a signalable process handle; a child with an expired deadline exits without starting native work. Cancellation and the gate grant share a lock. An operating-system stall during process creation can delay cleanup of bootstrap resources; it cannot grant capture or SDK work. This is not a real-time OS termination guarantee. Frame IPC is bounded JSON metadata plus raw BGR bytes; status and images remain in memory. Publication and cancellation share a lock so cancellation discards queued and late frames. Frozen entry points call multiprocessing freeze support before application argument parsing.
+
+Windows uses a pinned HWND/PID and client-only PrintWindow with physical screen coordinates and display-DPI metadata; it has no desktop fallback. macOS capture requires macOS 14+ ScreenCaptureKit and an existing Screen Recording grant, never prompts automatically, and selects the bound Roblox window. Its raw window region is labelled unverified content bounds. Both adapters validate identity and geometry before and after capture and reject invalid, minimized, missing, or oversized results. Fake-adapter checks do not establish hardware capture acceptance.
+
+The separate version-1 resource-pack loader accepts only a restricted local declarative schema, bounded PNG assets and metadata, explicit provenance/license/hash fields, anchors, positive/excluded states, and stability requirements. Routine lists must remain empty. No Maa pipeline, executable plugin, arbitrary action, network update, archive extraction, or engine integration is enabled. The reader rejects oversized/deep structures, malformed numbers/images, path escapes, symlinks and hardlinks. POSIX uses pinned directory descriptors; Windows path-identity checks do not provide the same descriptor-relative guarantees. A successful load is schema validation, not game-state recognition or pack distribution acceptance.
+
+### Game library design
+
+The separate offline HTML design follows [docs/UI_DESIGN.md](docs/UI_DESIGN.md): a dark violet/cyan library, original game-cover previews, per-game workspaces, explicit support status, and persistent Stop. Adopt Me is the first input-check profile; Bee Swarm Simulator and Blox Fruits are viewable proposed profiles with no input path. Game changes invalidate setup and arming; cleanup failure remains global. The HTML is simulated and is not the current native shell or a game compatibility claim.
+
 Windows uses documented Win32 APIs through `ctypes`; macOS uses AppKit/Quartz through PyObjC. Python 3.11+ with Tk is required for source execution. Installer binaries remain future delivery targets. A PyInstaller packaging recipe and automated test-artifact builds cover Windows x64 and macOS Apple Silicon/Intel. No Linux backend is provided.
 
 Templates are plain declarative JSON with no executable code, credentials, session tokens, screen images, or arbitrary text entry. The bundled Adopt Me input-check template tests controls only and does not claim to complete gameplay tasks.
