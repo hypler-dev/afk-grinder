@@ -21,7 +21,7 @@ The parser rejects duplicate JSON keys, non-finite and floating JSON numbers, un
 ## Draft workflow
 
 1. Create local manual example metadata. Keep screenshots and replay images out unless they are separately selected and consented.
-2. A local Gemma proposal may add labels, descriptions, and semantic requests. It has no execution or approval authority.
+2. The optional [local authoring command](LOCAL_AUTHORING.md) sends only explicitly selected train examples to an already installed local vision model and validates new labels, states and semantic requests. It has no execution or approval authority.
 3. Run `parse_training_packet(text)` for schema checks.
 4. Review held-out examples separately. Held-out items never enter `fine_tuning_records`.
 5. A separately approved future compiler may translate reviewed data into a restricted runtime pack. This module provides no compiler or approval path.

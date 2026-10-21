@@ -20,6 +20,8 @@ def main() -> None:
     mode.add_argument("--sdk-worker", action="store_true", help=argparse.SUPPRESS)
     mode.add_argument("--evaluate-pack", type=Path, metavar="PACK", help="Evaluate explicitly consented local image fixtures; no input or capture")
     mode.add_argument("--fixture-worker", type=Path, help=argparse.SUPPRESS)
+    mode.add_argument("--author-local", type=Path, metavar="PACK", help="Create a local model-authored training draft; no input or capture")
+    mode.add_argument("--author-worker", type=Path, metavar="PACK", help=argparse.SUPPRESS)
     parser.add_argument("--sdk-report", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--sdk-replacement-probe", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--training-packet", type=Path, help="Validated draft JSON describing selected image fixtures")
@@ -27,11 +29,57 @@ def main() -> None:
     parser.add_argument("--fixture-report", type=Path, help="New local metadata-only evaluation report")
     parser.add_argument("--fixture-consent", action="store_true", help="Consent to local reading of the selected fixtures; no training or export")
     parser.add_argument("--fixture-split", choices=("train", "validation", "held_out"), help="Evaluate one split (default: held_out)")
+    parser.add_argument("--author-model", help="Exact installed local model tag")
+    parser.add_argument("--author-digest", help="Exact SHA-256 digest for the local model")
+    parser.add_argument("--author-example", action="append", default=[], metavar="ID", help="Selected train example ID (repeat for each example)")
+    parser.add_argument("--author-output", type=Path, metavar="NEWPATH", help="New local metadata-only authoring report")
+    parser.add_argument("--author-consent", action="store_true", help="Consent to local selected-fixture authoring; no input or capture")
+    parser.add_argument("--author-port", type=int, default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.sdk_report and not args.sdk_worker:
         parser.error("--sdk-report is reserved for the SDK diagnostic worker.")
     if args.sdk_replacement_probe and not args.sdk_worker:
         parser.error("--sdk-replacement-probe is reserved for the SDK diagnostic worker.")
+    authoring = args.author_local is not None or args.author_worker is not None
+    author_options = (args.author_model, args.author_digest, args.author_example, args.author_output,
+                      args.author_consent, args.author_port)
+    if not authoring and any(value is not None and value is not False and value != [] for value in author_options):
+        parser.error("Authoring options require --author-local.")
+    if authoring:
+        fixture_author_conflicts = (args.training_packet, args.fixture_report, args.fixture_consent, args.fixture_split)
+        if any(value is not None and value is not False for value in fixture_author_conflicts):
+            parser.error("Authoring modes cannot use training-packet or fixture evaluation options.")
+        required_text = (args.author_model, args.author_digest)
+        if (not all(isinstance(value, str) and value.strip() for value in required_text)
+                or not args.author_example or any(not isinstance(value, str) or not value.strip() for value in args.author_example)
+                or not args.author_consent or args.author_output is None or args.fixture_directory is None):
+            parser.error("Local authoring requires --fixture-directory, --author-model, --author-digest, at least one --author-example, --author-output and --author-consent.")
+        from .local_authoring import AuthoringError, run_authoring, validate_output, worker, write_output
+
+        port = 11434 if args.author_port is None else args.author_port
+        try:
+            validate_output(args.author_output)
+        except AuthoringError as error:
+            parser.error(f"Local authoring output is invalid: {error.code}.")
+        if args.author_worker is not None:
+            worker(args.author_worker, args.fixture_directory, args.author_model, args.author_digest,
+                   tuple(args.author_example), args.author_output, consent=args.author_consent, port=port)
+            return
+        try:
+            report = run_authoring(args.author_local, args.fixture_directory, args.author_model, args.author_digest,
+                                   tuple(args.author_example), consent=args.author_consent, port=port)
+            payload = {"ok": True, "report": report}
+        except AuthoringError as error:
+            payload = {"ok": False, "error": error.code}
+        write_output(args.author_output, payload)
+        if sys.stdout is not None:
+            if payload["ok"] is True:
+                print("Local authoring completed; report saved. No input, capture or model changes.")
+            else:
+                print(f"Local authoring failed: {payload['error']}. See the metadata report. No input was sent.")
+        if payload["ok"] is not True:
+            sys.exit(1)
+        return
     evaluating = args.evaluate_pack is not None or args.fixture_worker is not None
     fixture_options = (args.training_packet, args.fixture_directory, args.fixture_report, args.fixture_consent, args.fixture_split)
     if not evaluating and any(value is not None and value is not False for value in fixture_options):

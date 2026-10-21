@@ -159,6 +159,18 @@ jobs:
       - name: Smoke-test packaged application without game input
         run: uv run --locked --extra build --extra recognition python tools/check_build.py
 
+      - name: Check frozen local authoring with synthetic loopback responses
+        run: |
+          if [ '${{ matrix.label }}' = 'windows-x64' ]; then
+            authoring_executable='dist/AFKGrinder/AFKGrinder.exe'
+          else
+            authoring_executable='dist/AFKGrinder.app/Contents/MacOS/AFKGrinder'
+          fi
+          AFK_GRINDER_TEST_AUTHOR_EXECUTABLE="$authoring_executable" \
+            uv run --locked --extra build --extra recognition python -m unittest \
+            tests.test_local_authoring.LocalAuthoringTests.test_real_disposable_worker_with_synthetic_loopback_protocol \
+            tests.test_local_authoring.LocalAuthoringTests.test_real_worker_sends_no_images_when_cloud_status_is_not_disabled -v
+
       - name: Package test download with source metadata and checksum
         run: >-
           uv run --locked --extra build --extra recognition python tools/package_build.py
