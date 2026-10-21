@@ -18,13 +18,53 @@ def main() -> None:
     mode.add_argument("--ui-smoke", action="store_true", help="Open and close a dry-run UI without native input")
     mode.add_argument("--sdk-check", action="store_true", help="Check optional local recognition with synthetic pixels only")
     mode.add_argument("--sdk-worker", action="store_true", help=argparse.SUPPRESS)
+    mode.add_argument("--evaluate-pack", type=Path, metavar="PACK", help="Evaluate explicitly consented local image fixtures; no input or capture")
+    mode.add_argument("--fixture-worker", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--sdk-report", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--sdk-replacement-probe", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--training-packet", type=Path, help="Validated draft JSON describing selected image fixtures")
+    parser.add_argument("--fixture-directory", type=Path, help="Explicitly selected fixture directory")
+    parser.add_argument("--fixture-report", type=Path, help="New local metadata-only evaluation report")
+    parser.add_argument("--fixture-consent", action="store_true", help="Consent to local reading of the selected fixtures; no training or export")
+    parser.add_argument("--fixture-split", choices=("train", "validation", "held_out"), help="Evaluate one split (default: held_out)")
     args = parser.parse_args()
     if args.sdk_report and not args.sdk_worker:
         parser.error("--sdk-report is reserved for the SDK diagnostic worker.")
     if args.sdk_replacement_probe and not args.sdk_worker:
         parser.error("--sdk-replacement-probe is reserved for the SDK diagnostic worker.")
+    evaluating = args.evaluate_pack is not None or args.fixture_worker is not None
+    fixture_options = (args.training_packet, args.fixture_directory, args.fixture_report, args.fixture_consent, args.fixture_split)
+    if not evaluating and any(value is not None and value is not False for value in fixture_options):
+        parser.error("Fixture options require --evaluate-pack.")
+    if evaluating:
+        if not all((args.training_packet, args.fixture_directory, args.fixture_report, args.fixture_consent)):
+            parser.error("Fixture evaluation requires --training-packet, --fixture-directory, --fixture-report and --fixture-consent.")
+        if args.fixture_report.exists() or args.fixture_report.is_symlink() or not args.fixture_report.parent.is_dir():
+            parser.error("--fixture-report must be a new file with an existing parent directory.")
+        from .fixture_evaluation import EvaluationError, run_evaluation, worker
+
+        split = args.fixture_split or "held_out"
+        if args.fixture_worker is not None:
+            worker(args.fixture_worker, args.training_packet, args.fixture_directory, args.fixture_report,
+                   consent=args.fixture_consent, split=split)
+            return
+        try:
+            report = run_evaluation(args.evaluate_pack, args.training_packet, args.fixture_directory,
+                                    consent=args.fixture_consent, split=split)
+            payload = {"ok": True, "report": report}
+        except EvaluationError as error:
+            payload = {"ok": False, "error": error.code}
+        with args.fixture_report.open("x", encoding="utf-8") as stream:
+            json.dump(payload, stream, allow_nan=False, separators=(",", ":"))
+            stream.write("\n")
+        if sys.stdout is not None:
+            if payload["ok"] is True:
+                print("Local static fixture evaluation completed; report saved. No input, capture or model training.")
+            else:
+                print(f"Local fixture evaluation failed: {payload['error']}. See the metadata report. No input was sent.")
+        if payload["ok"] is not True:
+            sys.exit(1)
+        return
     if args.sdk_check or args.sdk_worker:
         from .recognition.maa_adapter import SDKError, diagnostic, probe_sdk
 

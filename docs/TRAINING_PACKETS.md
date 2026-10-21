@@ -20,12 +20,20 @@ The parser rejects duplicate JSON keys, non-finite and floating JSON numbers, un
 
 ## Draft workflow
 
-1. Create local manual example metadata. Keep private replay images out unless they are separately selected and consented.
+1. Create local manual example metadata. Keep screenshots and replay images out unless they are separately selected and consented.
 2. A local Gemma proposal may add labels, descriptions, and semantic requests. It has no execution or approval authority.
 3. Run `parse_training_packet(text)` for schema checks.
 4. Review held-out examples separately. Held-out items never enter `fine_tuning_records`.
 5. A separately approved future compiler may translate reviewed data into a restricted runtime pack. This module provides no compiler or approval path.
 
-Qwen3.5-4B is the current local proposal-authoring evaluation candidate. Gemma 4 E4B is the quality challenger, and Gemma 4 E2B remains a smaller candidate; none is a selected runtime. See [local model evaluation](LOCAL_MODELS.md) for candidate evidence and source links. This code does not call Ollama, require a model runtime, download a model, send cloud requests, or load image pixels.
+The current runtime evaluator is a separate, explicit-consent path. Use the
+[pack evaluation guide](PACK_EVALUATION.md) for the CLI and evidence boundary. It reads only the
+selected packet examples, defaults to `held_out`, and reports metadata such as
+labels, scores, boxes, and confusion counts. It does not emit image bytes,
+fixture paths, or native text. Its disposable child has a 120-second deadline but is not an
+operating-system sandbox. Static candidate results are unstabilized; blocked
+protected states remain blocked.
+
+Qwen3.5-4B is the current local proposal-authoring evaluation candidate. Gemma 4 E4B is the quality challenger, and Gemma 4 E2B remains a smaller candidate; none is a selected runtime. See [local model evaluation](LOCAL_MODELS.md) for candidate evidence and source links. The training-packet parser does not call Ollama, require a model runtime, download a model, send cloud requests, or load image pixels. The separate fixture evaluator loads selected image pixels only with explicit fixture consent.
 
 `fine_tuning_records(packet, consent=True)` returns JSON text records for `train` and `validation` metadata only. It emits each relative file reference and SHA-256 claim, never image bytes, and requires explicit caller consent. It is not a fine-tuning runtime. Eventual fine-tuning work still needs a separately selected local runtime plus benchmark, license, hardware/resource, privacy, and held-out-evaluation gates.

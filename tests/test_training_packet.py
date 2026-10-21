@@ -7,7 +7,13 @@ import json
 from pathlib import Path
 import unittest
 
-from afk_grinder.training_packet import TrainingPacket, TrainingPacketError, fine_tuning_records, parse_training_packet
+from afk_grinder.training_packet import (
+    TrainingPacket,
+    TrainingPacketError,
+    fine_tuning_records,
+    parse_training_packet,
+    validate_training_packet,
+)
 
 
 def payload() -> dict[str, object]:
@@ -144,6 +150,28 @@ class TrainingPacketTests(unittest.TestCase):
                 invalid["demonstrations"][0]["capability_request"] = request
                 with self.assertRaises(TrainingPacketError):
                     self.parse(invalid)
+
+    def test_sealed_packet_revalidation_rejects_tampering_and_unsealed_construction(self):
+        packet = self.parse()
+        validated = validate_training_packet(packet)
+        self.assertEqual(validated, packet)
+        self.assertIsNot(validated, packet)
+
+        forged = TrainingPacket(
+            packet.id,
+            packet.version,
+            packet.game,
+            packet.locale,
+            packet.reference_size,
+            packet.states,
+            packet.examples,
+            packet.demonstrations,
+        )
+        changed = replace(packet, examples=(replace(packet.examples[0], split="held_out"), *packet.examples[1:]))
+        object.__setattr__(packet, "examples", (replace(packet.examples[0], path="examples/other.webp"), *packet.examples[1:]))
+        for candidate in (forged, changed, packet):
+            with self.subTest(candidate=type(candidate).__name__), self.assertRaises(TrainingPacketError):
+                validate_training_packet(candidate)
 
 
 if __name__ == "__main__":

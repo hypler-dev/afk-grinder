@@ -10,6 +10,7 @@ import math
 import os
 from pathlib import Path
 import re
+import time
 from typing import Any
 
 from .maa_adapter import (
@@ -134,18 +135,27 @@ class TemplateHit:
 class TemplateMatcher:
     """CPU-only, bounded template matching with no action or capture APIs."""
 
+    _template_limit = MAX_TEMPLATES
+    _template_pixel_limit = MAX_TEMPLATE_PIXELS
+
     def __init__(self, specs: tuple[TemplateSpec, ...] | list[TemplateSpec]) -> None:
-        if not isinstance(specs, (tuple, list)) or not 0 < len(specs) <= MAX_TEMPLATES:
-            raise ValueError("Matcher requires between one and sixteen templates.")
+        if not isinstance(specs, (tuple, list)) or not 0 < len(specs) <= self._template_limit:
+            raise ValueError("Matcher template count exceeds its engine-owned limit.")
         if not all(isinstance(spec, TemplateSpec) for spec in specs):
             raise ValueError("Matcher templates must be TemplateSpec instances.")
         if len({spec.template_id for spec in specs}) != len(specs):
             raise ValueError("Matcher template identifiers must be unique.")
-        if sum(spec.width * spec.height for spec in specs) > MAX_TEMPLATE_PIXELS:
+        if sum(spec.width * spec.height for spec in specs) > self._template_pixel_limit:
             raise ValueError("Matcher templates exceed the pixel safety limit.")
         self._specs = tuple(specs)
         self._tasker: Any = None
         self._closed = False
+
+    def warmup(self) -> None:
+        """Load read-only resources before the caller obtains a fresh frame."""
+        if self._closed:
+            raise SDKError("Recognition matcher is closed.")
+        self._ensure_initialized()
 
     def match(self, width: int, height: int, pixels: bytes, *, timeout: float = 2.0) -> tuple[TemplateHit, ...]:
         """Match one BGR frame. Misses return metadata with ``box=None``."""
@@ -156,9 +166,18 @@ class TemplateMatcher:
             raise SDKError("Recognition matcher is closed.")
         self._ensure_initialized()
         try:
+            deadline = time.monotonic() + timeout
             numpy = importlib.import_module("numpy")
             frame = numpy.frombuffer(pixels, dtype=numpy.uint8).reshape((height, width, 3))
-            hits = tuple(self._match_one(spec, frame, width, height, timeout) for spec in self._specs)
+            results = []
+            for spec in self._specs:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise SDKError("Recognition match timed out.")
+                results.append(self._match_one(spec, frame, width, height, remaining))
+            if time.monotonic() > deadline:
+                raise SDKError("Recognition match timed out.")
+            hits = tuple(results)
         except SDKError:
             raise
         except Exception as error:

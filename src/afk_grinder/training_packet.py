@@ -131,6 +131,19 @@ def fine_tuning_records(packet: TrainingPacket, *, consent: bool = False) -> tup
     return tuple(records)
 
 
+def validate_training_packet(packet: TrainingPacket) -> TrainingPacket:
+    """Revalidate a sealed draft without exporting or reading any image data."""
+    if type(packet) is not TrainingPacket:
+        raise TrainingPacketError("packet must be a strictly validated TrainingPacket")
+    try:
+        canonical = _canonical_packet_json(packet)
+        if not packet._validated_digest or packet._validated_digest != _packet_digest(packet):
+            raise TrainingPacketError("packet was not sealed by strict validation")
+        return parse_training_packet(canonical)
+    except (AttributeError, TypeError, ValueError, OverflowError) as error:
+        raise TrainingPacketError("packet is not a valid sealed draft") from error
+
+
 def _packet_digest(packet: TrainingPacket) -> str:
     return hashlib.sha256(_canonical_packet_json(packet).encode("utf-8")).hexdigest()
 

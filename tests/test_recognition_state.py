@@ -17,7 +17,7 @@ import zlib
 from afk_grinder.models import Target
 from afk_grinder.recognition.observation import Layout, Observation, Rect
 from afk_grinder.recognition.packs import State, load_pack
-from afk_grinder.recognition.state import StateInspector
+from afk_grinder.recognition.state import StateInspector, classify_scores
 
 
 def _chunk(kind: bytes, payload: bytes) -> bytes:
@@ -100,6 +100,21 @@ class StateInspectorTests(unittest.TestCase):
             ("known", "ready", "stable", 3),
             ("known", "ready", "stable", 3),
         ])
+
+    def test_static_fixture_classification_never_claims_live_stability(self):
+        pack = _pack({"a": 0.8}, [_state("ready", ["a"], kind="gameplay")])
+        result = classify_scores(pack, {"a": 0.9})
+        self.assertEqual((result.status, result.state_id, result.kind, result.reason),
+                         ("candidate", "ready", "gameplay", "unstabilized"))
+        self.assertFalse(hasattr(result, "stable_frames"))
+        inspector = StateInspector(pack)
+        self.assertEqual(self.inspect(inspector, 1, {"a": 0.9}).status, "unknown")
+        self.assertEqual(self.inspect(inspector, 2, {"a": 0.9}).status, "known")
+        for kind in ("popup", "transaction", "loading", "disconnected", "unknown"):
+            with self.subTest(kind=kind):
+                classified = classify_scores(_pack({"a": 0.8}, [_state("screen", ["a"], kind=kind)]), {"a": 0.9})
+                self.assertNotEqual(classified.status, "candidate")
+                self.assertEqual(classified.kind, kind)
 
     def test_stable_state_kinds_gate_results_without_action_permission(self):
         expected = {

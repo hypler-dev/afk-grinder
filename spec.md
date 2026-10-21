@@ -10,6 +10,17 @@ Last updated: 2026-10-20
 
 The application is a local Python desktop application with a bundled pywebview game-library interface for Windows and macOS. Its default runtime remains the supervised input prototype. The adopted [BUILD.md](BUILD.md) defines further milestones; implementation status and evidence live in [plan.md](plan.md). No runtime multimodal LLM, cloud inference, login automation, or credential storage is used. The active popup path uses optional private Maa CPU OCR with pinned PP-OCR v3 English detection and PP-OCR v4 English recognition assets; future Qwen3.5-4B work is local multimodal authoring evaluation only and is not active OCR.
 
+Developer-only static fixture evaluation is available through
+[`docs/PACK_EVALUATION.md`](docs/PACK_EVALUATION.md). It requires explicit
+`--fixture-consent`, evaluates only the selected packet split (default
+`held_out`, maximum 64 examples), and writes a new metadata-only report. It
+uses a disposable child with a 120-second deadline; this is not an OS sandbox.
+The runtime pack compiler accepts validated pack data and bounded uniform-scale
+template variants. A future training-to-pack proposal compiler is separate and
+not implemented. Static candidates are unstabilized; protected states block,
+and evaluation does not establish temporal stability, live readiness, approval,
+input, capture, or publication.
+
 The default mode is dry run. A user can edit a version-1 JSON template containing `hold_key`, `click`, and `wait` actions. Keys are restricted to movement/interact controls; clicks use the current pointer position. Individual holds and waits are at most five seconds, a template has at most 100 steps, and total execution including a three-second start countdown is at most 30 seconds. No repeat loop is supported.
 
 The launcher automatically discovers verified running Roblox players without moving focus. macOS enumerates the exact Roblox bundle identity and re-resolves each process; Windows enumerates eligible visible top-level windows and resolves each PID's exact player executable. One candidate binds automatically. Multiple candidates require an explicit choice, which remains selected while that identity survives. Opaque candidate IDs are not recycled for replacement targets. Missing, failed or stalled discovery invalidates acknowledgment and setup. Discovery never arms, starts or resumes input.

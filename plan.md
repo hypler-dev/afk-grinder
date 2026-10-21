@@ -8,6 +8,40 @@ Last updated: 2026-10-20
 
 ## Current checkpoint
 
+The active product packet connects restricted resource-pack anchors to actual local template recognition and explicitly selected fixture evaluation for BUILD.md milestone 2. The compiler uses only validated in-memory pack assets, uniform template scaling and explicit reference-to-content ROI mapping, with engine-owned count, decoded-pixel and search-work caps. A developer CLI evaluates separately selected, consented training fixtures through the pinned read-only Maa matcher in a bounded child process and emits metadata-only per-state confusion and protected-state error counts. Fixture results are static classification evidence; they do not establish temporal stability, capture calibration, gameplay readiness or permission to act. Replay remains off and is never used as a dataset source. Sol owns architecture, privacy decisions, native recognition, CLI/state integration and final judgment. Disjoint native workers may implement only the pure compiler and explicit fixture byte loader/tests. Required evidence includes actual synthetic-pixel Maa recognition, scale/ROI and workload boundaries, missing/tampered/escaping fixture rejection, protected/unknown/ambiguous classification, cancellation/deadline cleanup, fresh independent review and the unchanged input/permission/publication gates. Current `bc35b6c` app and its pending permission request are not replaced. Real Adopt Me held-out fixtures and all remaining BUILD acceptance gates stay open.
+
+The static-fixture implementation passes all 389 source tests without skips, including the pinned OCR canaries and an actual Maa template-evaluation CLI canary. The original synthetic dataset has nine held-out fixtures: five exact label matches, zero protected fixtures predicted as gameplay candidates, and deliberate excluded, ambiguous and unknown outcomes. Both 96×64 and 144×96 frames use 20 template variants; the 48×32 fixture is rejected as unsupported layout. This is not Adopt Me evidence, temporal stability, native calibration, or milestone-2 completion. Receipt: `/private/tmp/afk-grinder-fixture-evaluation-f8b-final.json`; final suite log: `/private/tmp/afk-grinder-pack-evaluation-tests-final.log`. Compilation, specification/plan validators and whitespace checks pass. Native display access was required only for the unchanged no-capture macOS display-bootstrap test; its initial sandboxed attempt failed, and the final full suite passed without weakening assertions.
+
+The parent binds child reports to the selected pack/dataset identities and exact example IDs, labels, kinds, dimensions and pack anchors, then checks independently recomputed classifications, confusion and protected-error counts. Reported classifications must agree with the anchor scores and layout metadata; the native child remains responsible for actual pixel matching. A fresh OpenAI Terra-xhigh review found the missing parent binding; Sol fixed it and OpenAI Terra-high added forged-but-self-consistent report regressions. The fresh reviewer closed the finding and reports no remaining findings. Sol owns runtime integration, privacy decisions, validation and release judgment; OpenAI Terra-high produced the bounded compiler, fixture loader, evaluator tests and frozen smoke, and OpenAI Luna-medium produced the initial documentation. Native role models are `gpt-5.6-terra` high/xhigh and `gpt-5.6-luna` medium. GLM stayed skipped under the existing registry gate; no GLM contact, external payload or Spark fallback occurred. A separate fresh Terra-xhigh frozen-smoke review caught an aggregate-only evidence gap; the host now binds generated inputs and requires every expected fixture outcome. Its forged-report and equal-total outcome-swap regressions pass, and both final reviewers report no remaining findings. The actual source CLI also passes that complete host-smoke outcome contract. Cross-platform frozen CI evidence remains pending.
+
+Exact static-fixture packet paths:
+
+```text
+README.md
+docs/PACK_EVALUATION.md
+docs/TRAINING_PACKETS.md
+plan.md
+spec.md
+src/afk_grinder/__main__.py
+src/afk_grinder/fixture_evaluation.py
+src/afk_grinder/recognition/matcher.py
+src/afk_grinder/recognition/pack_compiler.py
+src/afk_grinder/recognition/state.py
+src/afk_grinder/training_fixtures.py
+src/afk_grinder/training_packet.py
+tests/test_fixture_build_smoke.py
+tests/test_fixture_evaluation.py
+tests/test_matcher.py
+tests/test_pack_compiler.py
+tests/test_recognition_state.py
+tests/test_training_fixtures.py
+tests/test_training_packet.py
+tools/check_build.py
+tools/make_fixture_demo.py
+```
+
+No unrelated dirt is included. No current-app replacement, permission grant, game input, capture, replay, private image reuse, model download/training, SDK-bearing upload, installer, production signing/release or deployment occurs in this packet. The pending `bc35b6c` Screen Recording request and all native calibration/popup/reconnect/BUILD acceptance gates remain open.
+
 The compatible SDK source-replacement packet is committed and pushed as `1c1e51776431e928132e2b6c37a39cf7af72b7c9`. All three jobs passed [manual CI run 39516584326](https://github.com/hypler-dev/afk-grinder/actions/runs/39516584326), including actual native source builds, three-core replacement in separate private frozen copies, the inert marker/read-only lifecycle check, unchanged original hashes and final SDK-free packaging. Both Macs record seven internal SDK load paths and local ad-hoc deep strict signatures; Windows does not attest every transitive DLL load path. CI used CMake 4.4.3/4.4.2/4.4.4 on arm64 Mac/Intel Mac/Windows respectively. All three modified probe sources have SHA-256 `2ed8ec3e152f2059225b0c34fea13cbcf683642aaee384afaecdf850f856cdb1`. Mac build target 13.3 is not a minimum-OS runtime claim. The default push run `39516568121` was automatically cancelled in favor of the manual run, which includes the same normal checks plus source replacement.
 
 All 351 local source tests pass without skips, including two pinned OCR canaries. Compile checks, specification/plan validators and whitespace checks pass. All three official binary prerequisites pass actual size/SHA verification and safe archive inspection. Fresh OpenAI Terra-xhigh reviews passed the orchestration/diagnostic/workflow packet and the dependency helper separately; the latter review's symlink-chain complexity finding was fixed with a 16-link cap and boundary tests. The Windows zero-link preparation fixture also passes. Sol owns provenance, native diagnostics, integration, validation and final judgment; OpenAI Terra-high produced the isolated dependency helper/tests, and OpenAI Luna-medium produced the initial developer documentation. Native worker/reviewer model is `gpt-5.6-terra` at high/xhigh respectively; docs/reader model is `gpt-5.6-luna` at medium. GLM stayed skipped under its prior registry gate; no GLM contact or payload transfer and no Spark fallback occurred.

@@ -37,6 +37,22 @@ def spec(template_id="template", *, roi=(0, 0, 16, 16), threshold=0.95):
 
 
 class MatcherValidationTests(unittest.TestCase):
+    def test_template_batch_uses_one_deadline_and_closed_warmup_loads_nothing(self):
+        instance = matcher.TemplateMatcher([spec("first"), spec("second")])
+        with patch.object(instance, "_ensure_initialized"), \
+             patch.object(matcher.importlib, "import_module", return_value=FakeNumpy), \
+             patch.object(matcher.time, "monotonic", side_effect=[10.0, 10.1, 10.4, 11.1]), \
+             patch.object(instance, "_match_one", return_value=matcher.TemplateHit("first", 0.0, None)) as match:
+            with self.assertRaisesRegex(matcher.SDKError, "timed out"):
+                instance.match(16, 16, bytes(16 * 16 * 3), timeout=1.0)
+        self.assertAlmostEqual(match.call_args_list[0].args[-1], 0.9)
+        self.assertAlmostEqual(match.call_args_list[1].args[-1], 0.6)
+        instance.close()
+        with patch.object(instance, "_ensure_initialized") as initialize:
+            with self.assertRaises(matcher.SDKError):
+                instance.warmup()
+            initialize.assert_not_called()
+
     def test_template_spec_rejects_invalid_metadata_before_sdk_use(self):
         cases = (
             {"width": True}, {"height": 7}, {"pixels": b"x"}, {"roi": [0, 0, 16, 16]},

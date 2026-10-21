@@ -6,6 +6,11 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+
+
+FIXTURE_EVALUATION_HARNESS_TIMEOUT = 130.0
+_SYNTHETIC_SOURCE_REVISION = "0" * 40
 
 
 KNOWN_MAC_PERMISSION_MESSAGES = (
@@ -29,17 +34,22 @@ def frozen_executable(root: Path, *, system: str | None = None) -> Path:
     return executable
 
 
-def _run(executable: Path, argument: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    executable: Path, *arguments: str, timeout: float = 30.0,
+) -> subprocess.CompletedProcess[str]:
+    """Run one frozen diagnostic with a bounded lifetime."""
+    command = [str(executable), *arguments]
+    description = " ".join(arguments)
     try:
         return subprocess.run(
-            [str(executable), argument],
+            command,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout,
             check=False,
         )
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"{argument} timed out after 30 seconds.") from error
+        raise RuntimeError(f"{description} timed out after {timeout:g} seconds.") from error
 
 
 def _print_diagnostics(argument: str, result: subprocess.CompletedProcess[str]) -> None:
@@ -63,6 +73,78 @@ def _acceptable_macos_check(result: subprocess.CompletedProcess[str]) -> bool:
     ) and all(line in KNOWN_MAC_PERMISSION_MESSAGES or line in foreground_lines for line in lines)
 
 
+def _fixture_evaluation_smoke(executable: Path, *, recognition: bool) -> None:
+    """Exercise frozen fixture evaluation with original synthetic pixels only."""
+    from afk_grinder.fixture_evaluation import (
+        MAX_REPORT_BYTES,
+        EvaluationError,
+        _bind_report,
+        _load_metadata,
+        _read_json,
+        _validate_report,
+    )
+    if __package__:
+        from .make_fixture_demo import generate
+    else:
+        from make_fixture_demo import generate
+
+    with tempfile.TemporaryDirectory(prefix="afk-grinder-fixture-build-") as temporary:
+        destination = Path(temporary) / "synthetic-demo"
+        pack, training_packet, fixtures = generate(destination, _SYNTHETIC_SOURCE_REVISION)
+        report_path = Path(temporary) / "fixture-evaluation.json"
+        evaluation = _run(
+            executable,
+            "--evaluate-pack", str(pack),
+            "--training-packet", str(training_packet),
+            "--fixture-directory", str(fixtures),
+            "--fixture-consent",
+            "--fixture-report", str(report_path),
+            timeout=FIXTURE_EVALUATION_HARNESS_TIMEOUT,
+        )
+        _print_diagnostics("--evaluate-pack", evaluation)
+        try:
+            payload = _read_json(report_path, MAX_REPORT_BYTES)
+        except Exception as error:
+            raise RuntimeError("Frozen --evaluate-pack did not write a valid metadata report.") from error
+
+        if not recognition:
+            if evaluation.returncode != 1 or payload != {"ok": False, "error": "recognition_failed"}:
+                raise RuntimeError("SDK-free frozen --evaluate-pack did not fail as recognition_failed.")
+            return
+
+        if evaluation.returncode != 0:
+            raise RuntimeError("Frozen --evaluate-pack failed with the recognition SDK present.")
+        try:
+            report = _validate_report(payload)
+            loaded_pack, packet = _load_metadata(pack, training_packet)
+            _bind_report(report, loaded_pack, packet, "held_out")
+        except EvaluationError as error:
+            raise RuntimeError("Frozen --evaluate-pack wrote an invalid metadata report.") from error
+        expected_outcomes = (
+            ("clear", "candidate", "gameplay", "unstabilized"),
+            ("large", "candidate", "gameplay", "unstabilized"),
+            ("purchase", "blocked", "transaction", "transaction"),
+            ("notice", "blocked", "popup", "popup"),
+            ("overlay", "blocked", None, "excluded"),
+            ("conflict", "unknown", None, "ambiguous"),
+            ("unclassified", "unknown", None, "no_match"),
+            ("known-unknown", "unknown", "unknown", "unknown_screen"),
+            ("small", "unknown", None, "unsupported_layout"),
+        )
+        outcomes = tuple(
+            (row["example_id"], row["status"], row["predicted_state"], row["reason"])
+            for row in report["examples"]
+        )
+        false_flags = (
+            "temporal_stability_evaluated", "live_readiness", "approved", "native_input",
+            "screen_capture", "persistent_images", "model_training",
+        )
+        if (outcomes != expected_outcomes or report["split"] != "held_out" or report["example_count"] != 9
+                or report["exact_label_matches"] != 5 or report["unsafe_protected_predictions"] != 0
+                or any(report[flag] is not False for flag in false_flags)):
+            raise RuntimeError("Frozen --evaluate-pack report did not preserve synthetic fixture safety expectations.")
+
+
 def smoke(root: Path, *, system: str | None = None, recognition: bool = False) -> None:
     """Run frozen ``--dry-run`` and platform-aware ``--check`` diagnostics."""
     system = system or sys.platform
@@ -72,6 +154,7 @@ def smoke(root: Path, *, system: str | None = None, recognition: bool = False) -
         _print_diagnostics("--sdk-check", sdk)
         if sdk.returncode != 0:
             raise RuntimeError("Frozen --sdk-check failed.")
+    _fixture_evaluation_smoke(executable, recognition=recognition)
     dry_run = _run(executable, "--dry-run")
     _print_diagnostics("--dry-run", dry_run)
     if dry_run.returncode != 0:

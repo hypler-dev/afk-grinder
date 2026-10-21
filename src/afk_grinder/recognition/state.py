@@ -31,6 +31,72 @@ class StateInspection:
     kind: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class StaticInspection:
+    """Classification of one fixture's scores, without temporal evidence.
+
+    A ``candidate`` is deliberately distinct from a live ``known`` result.
+    This type carries no observation, stability, readiness or action authority.
+    """
+
+    status: str
+    state_id: str | None
+    reason: str
+    kind: str | None = None
+
+
+def _select_state(states: tuple[State, ...], thresholds: dict[str, float],
+                  scores: dict[str, int | float | None]) -> tuple[State | None, str]:
+    if (type(scores) is not dict or any(anchor_id not in thresholds for anchor_id in scores)
+            or not all(score is None or _score_number(score) for score in scores.values())):
+        return None, "invalid_evidence"
+    blocked = False
+    candidates: list[State] = []
+    unresolved = False
+    for state in states:
+        positive = tuple(scores.get(anchor_id) for anchor_id in state.positive)
+        if any(score is not None and score < thresholds[anchor_id]
+               for anchor_id, score in zip(state.positive, positive)):
+            continue
+        if any(score is None for score in positive):
+            unresolved = True
+            continue
+        exclusions = tuple(scores.get(anchor_id) for anchor_id in state.exclude)
+        if any(score is not None and score >= thresholds[anchor_id]
+               for anchor_id, score in zip(state.exclude, exclusions)):
+            blocked = True
+            continue
+        if any(score is None for score in exclusions):
+            unresolved = True
+            continue
+        candidates.append(state)
+    if blocked:
+        return None, "excluded"
+    if len(candidates) != 1:
+        if candidates:
+            return None, "ambiguous"
+        return None, "insufficient_evidence" if unresolved else "no_match"
+    if unresolved:
+        return None, "insufficient_evidence"
+    return candidates[0], "candidate"
+
+
+def classify_scores(pack: ResourcePack, scores: dict[str, int | float | None]) -> StaticInspection:
+    """Classify static fixture evidence using the live inspector's selection rules."""
+    if type(pack) is not ResourcePack:
+        raise TypeError("Static inspection requires a validated ResourcePack.")
+    state, reason = _select_state(pack.states, {anchor.id: anchor.threshold for anchor in pack.anchors}, scores)
+    if state is None:
+        return StaticInspection("blocked" if reason == "excluded" else "unknown", None, reason)
+    if type(state.kind) is not str or state.kind not in SUPPORTED_STATE_KINDS:
+        return StaticInspection("unknown", None, "invalid_state_kind")
+    if state.kind in {"unclassified", "gameplay"}:
+        return StaticInspection("candidate", state.id, "unstabilized", state.kind)
+    if state.kind == "unknown":
+        return StaticInspection("unknown", state.id, "unknown_screen", state.kind)
+    return StaticInspection("blocked", state.id, state.kind, state.kind)
+
+
 class StateInspector:
     """Interpret validated-pack scores without retaining observations or pixels."""
 
@@ -64,41 +130,10 @@ class StateInspector:
         # The identity is consumed before evidence validation.  A bad score
         # payload cannot be retried later as a fresh observation.
         self._watermark = (observation.generation, observation.sequence, observation.captured_at)
-        if not self._valid_scores(scores):
-            return self._unknown("invalid_evidence")
-
-        blocked = False
-        candidates: list[State] = []
-        unresolved = False
-        for state in self._states:
-            positive = tuple(scores.get(anchor_id) for anchor_id in state.positive)
-            if any(score is not None and not self._matches(anchor_id, score)
-                   for anchor_id, score in zip(state.positive, positive)):
-                continue
-            if any(score is None for score in positive):
-                unresolved = True
-                continue
-
-            exclusions = tuple(scores.get(anchor_id) for anchor_id in state.exclude)
-            if any(score is not None and self._matches(anchor_id, score)
-                   for anchor_id, score in zip(state.exclude, exclusions)):
-                blocked = True
-                continue
-            if any(score is None for score in exclusions):
-                unresolved = True
-                continue
-            candidates.append(state)
-
-        if blocked:
-            return self._blocked()
-        if len(candidates) != 1:
-            if candidates:
-                return self._unknown("ambiguous")
-            return self._unknown("insufficient_evidence" if unresolved else "no_match")
-        if unresolved:
-            return self._unknown("insufficient_evidence")
-
-        return self._candidate(candidates[0], observation)
+        state, reason = _select_state(self._states, self._thresholds, scores)
+        if state is None:
+            return self._blocked() if reason == "excluded" else self._unknown(reason)
+        return self._candidate(state, observation)
 
     def _out_of_order(self, observation: Observation) -> bool:
         if self._watermark is None:
@@ -107,14 +142,6 @@ class StateInspector:
         return (observation.generation < generation
                 or observation.sequence <= sequence
                 or observation.captured_at <= captured_at)
-
-    def _valid_scores(self, scores: object) -> bool:
-        if type(scores) is not dict or any(anchor_id not in self._thresholds for anchor_id in scores):
-            return False
-        return all(score is None or _score_number(score) for score in scores.values())
-
-    def _matches(self, anchor_id: str, score: int | float) -> bool:
-        return score >= self._thresholds[anchor_id]
 
     def _candidate(self, state: State, observation: Observation) -> StateInspection:
         if type(state.kind) is not str or state.kind not in SUPPORTED_STATE_KINDS:
