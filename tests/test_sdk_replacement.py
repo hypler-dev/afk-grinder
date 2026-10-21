@@ -219,12 +219,19 @@ class SdkReplacementTests(unittest.TestCase):
     def test_frozen_macos_verifier_requires_seven_private_dyld_libraries(self):
         copy, paths = self._mac_loader_fixture()
         expected = self._lifecycle_report()
-        stderr = "\n".join(f"dyld: loaded {path}" for path in paths)
+        # Keep literal Unix loader traces on every test host. Map only their
+        # fictional absolute roots to real host files; containment still uses
+        # pathlib against the real temporary bundle.
+        aliases = {f"/__dyld_fixture__/{index}/{path.name}": path for index, path in enumerate(paths)}
+        def fixture_path(value):
+            return aliases[value] if isinstance(value, str) and value in aliases else Path(value)
+        stderr = "\n".join(f"dyld: loaded {path}" for path in aliases)
         work = self.root / "mac-success"
         work.mkdir()
         with patch.object(verifier, "_run", side_effect=self._frozen_worker(
                 work, {"ok": True, "report": expected}, stderr=stderr)), \
-             patch.object(verifier, "_worker_environment", return_value={}):
+             patch.object(verifier, "_worker_environment", return_value={}), \
+             patch.object(verifier, "Path", side_effect=fixture_path):
             result, loaded = verifier._frozen_probe(copy, work, "macos-arm64")
         self.assertEqual(result, expected)
         self.assertNotIn("windows_sdk_loads", result)
@@ -233,16 +240,18 @@ class SdkReplacementTests(unittest.TestCase):
         outside = self.root / "outside" / "libMaaFramework.dylib"
         outside.parent.mkdir()
         outside.write_bytes(b"outside")
+        aliases["/__dyld_fixture__/outside/libMaaFramework.dylib"] = outside
         for label, trace in (
-                ("missing", "\n".join(f"dyld: loaded {path}" for path in paths[:-1])),
-                ("outside", f"dyld: loaded {outside}"),
+                ("missing", "\n".join(f"dyld: loaded {path}" for path in list(aliases)[:6])),
+                ("outside", "dyld: loaded /__dyld_fixture__/outside/libMaaFramework.dylib"),
         ):
             with self.subTest(label=label):
                 work = self.root / f"mac-{label}"
                 work.mkdir()
                 with patch.object(verifier, "_run", side_effect=self._frozen_worker(
                         work, {"ok": True, "report": expected}, stderr=trace)), \
-                     patch.object(verifier, "_worker_environment", return_value={}):
+                     patch.object(verifier, "_worker_environment", return_value={}), \
+                     patch.object(verifier, "Path", side_effect=fixture_path):
                     with self.assertRaises(ValueError):
                         verifier._frozen_probe(copy, work, "macos-arm64")
 
