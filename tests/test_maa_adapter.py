@@ -42,14 +42,18 @@ class SDKBoundaryTests(unittest.TestCase):
         }
         return modules, tasker_type, tasker
 
-    def probe(self, *, require_replacement=False, marker=None, **kwargs):
+    def probe(self, *, require_replacement=False, marker=None, loader_observation=None, **kwargs):
         modules, tasker_type, tasker = self.fake_modules(**kwargs)
+        self.template_check = Mock()
+        self.loader_check = Mock(return_value=loader_observation)
         if marker is not None:
             modules["maa.library"].Library.framework = Mock(return_value=SimpleNamespace(AfkGrinderReplacementProbe=marker))
         with patch.dict(adapter.os.environ, {}, clear=True), \
              patch.object(adapter.importlib.metadata, "version", return_value="5.14.3"), \
              patch.object(adapter.importlib.util, "find_spec", return_value=object()), \
-             patch.object(adapter.importlib, "import_module", side_effect=modules.__getitem__):
+             patch.object(adapter.importlib, "import_module", side_effect=modules.__getitem__), \
+             patch.object(adapter, "_probe_replacement_template", self.template_check), \
+             patch.object(adapter, "_windows_replacement_loads", self.loader_check):
             report = adapter.probe_sdk(require_replacement=require_replacement)
         return report, tasker_type, tasker
 
@@ -74,6 +78,8 @@ class SDKBoundaryTests(unittest.TestCase):
         marker = Mock(return_value=adapter.REPLACEMENT_PROBE.encode("ascii"))
         report, _, tasker = self.probe(require_replacement=True, marker=marker)
         self.assertEqual(report["replacement_probe"], adapter.REPLACEMENT_PROBE)
+        self.assertEqual(report["synthetic_template_match"], "passed")
+        self.template_check.assert_called_once_with()
         self.assertFalse(report["native_input"])
         self.assertEqual(report["capture_source"], "synthetic")
         marker.assert_called_once_with()
@@ -89,6 +95,57 @@ class SDKBoundaryTests(unittest.TestCase):
         report, _, _ = self.probe(marker=marker)
         marker.assert_not_called()
         self.assertNotIn("replacement_probe", report)
+        self.assertNotIn("synthetic_template_match", report)
+        self.assertNotIn("windows_sdk_loads", report)
+        self.template_check.assert_not_called()
+        self.loader_check.assert_not_called()
+
+    def test_windows_load_observation_is_private_and_platform_specific(self):
+        marker = Mock(return_value=adapter.REPLACEMENT_PROBE.encode("ascii"))
+        observation = {"schema_version": 1, "scope": "synthetic-replacement-worker", "loaded": [], "unobserved": []}
+        for system in ("darwin", "win32"):
+            with self.subTest(system=system), patch.object(adapter.sys, "platform", system):
+                report, _, _ = self.probe(require_replacement=True, marker=marker, loader_observation=observation)
+            if system == "win32":
+                self.assertIs(report["windows_sdk_loads"], observation)
+                self.loader_check.assert_called_once_with()
+            else:
+                self.assertNotIn("windows_sdk_loads", report)
+                self.loader_check.assert_not_called()
+        with patch.object(adapter.sys, "platform", "win32"), patch.object(adapter.sys, "frozen", False, create=True):
+            with self.assertRaisesRegex(adapter.SDKError, "requires a frozen worker"):
+                adapter._windows_replacement_loads()
+
+    def test_replacement_template_requires_exact_original_match_and_always_closes(self):
+        from afk_grinder.recognition.matcher import TemplateHit
+        valid = TemplateHit("sdk-replacement", .99, (11, 9, 16, 16))
+        for result in ((valid,), (), (TemplateHit("other", .99, valid.box),),
+                       (TemplateHit(valid.template_id, .99, (12, 9, 16, 16)),),
+                       (TemplateHit(valid.template_id, float("nan"), valid.box),),
+                       (TemplateHit(valid.template_id, True, valid.box),)):
+            instance = Mock()
+            instance.match.return_value = result
+            with self.subTest(result=result), \
+                 patch('afk_grinder.recognition.matcher.TemplateMatcher', return_value=instance) as factory:
+                if result == (valid,):
+                    adapter._probe_replacement_template()
+                    spec = factory.call_args.args[0][0]
+                    width, height, pixels = instance.match.call_args.args
+                    self.assertEqual((width, height), (96, 64))
+                    self.assertEqual(instance.match.call_args.kwargs, {"timeout": 2})
+                    for row in range(16):
+                        offset = ((9 + row) * 96 + 11) * 3
+                        self.assertEqual(pixels[offset:offset + 48], spec.pixels[row * 48:(row + 1) * 48])
+                else:
+                    with self.assertRaises(adapter.SDKError):
+                        adapter._probe_replacement_template()
+            instance.close.assert_called_once_with()
+        instance = Mock()
+        instance.match.side_effect = adapter.SDKError("Synthetic timeout")
+        with patch('afk_grinder.recognition.matcher.TemplateMatcher', return_value=instance), \
+             self.assertRaises(adapter.SDKError):
+            adapter._probe_replacement_template()
+        instance.close.assert_called_once_with()
 
     def test_replacement_mode_rejected_before_import_and_reserved_to_worker(self):
         with patch.object(adapter.importlib, "import_module") as load:

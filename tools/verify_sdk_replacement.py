@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -78,12 +79,27 @@ def _run(command: list[str], *, timeout: float = 30, **options: Any) -> subproce
     return subprocess.run(command, check=True, timeout=timeout, **options)
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _read_json(path: Path, *, limit: int = 4096) -> dict[str, Any]:
     mode = path.lstat()
-    _require(stat.S_ISREG(mode.st_mode) and mode.st_nlink == 1 and mode.st_size <= 4096,
+    _require(stat.S_ISREG(mode.st_mode) and mode.st_nlink == 1 and mode.st_size <= limit,
              "SDK test metadata must be a bounded regular file.")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    _require(isinstance(value, dict), "SDK test metadata must be an object.")
+    def unique_pairs(items):
+        result = {}
+        for key, value in items:
+            _require(key not in result, "SDK test metadata contains duplicate keys.")
+            result[key] = value
+        return result
+    def finite_float(value):
+        result = float(value)
+        _require(math.isfinite(result), "SDK test metadata contains a non-finite number.")
+        return result
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_pairs,
+                           parse_float=finite_float,
+                           parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()))
+    except (ValueError, UnicodeError):
+        raise ValueError("SDK test metadata must be strict JSON.") from None
+    _require(type(value) is dict, "SDK test metadata must be an object.")
     return value
 
 
@@ -206,13 +222,24 @@ def _frozen_probe(copy: Path, work: Path, label: str) -> tuple[dict[str, Any], l
     report_path = work / "sdk-worker.json"
     completed = _run([str(executable), "--sdk-worker", "--sdk-report", str(report_path), "--sdk-replacement-probe"],
                      timeout=30, cwd=work, env=_worker_environment(copy, label), capture_output=True, text=True)
-    payload = _read_json(report_path)
+    _require(completed.returncode == 0, "Frozen SDK replacement worker did not exit successfully.")
+    payload = _read_json(report_path, limit=65_536)
     expected = {"sdk_version": PINNED_MAA_VERSION, "native_version": PINNED_MAA_VERSION,
                 "source_revision": MAA_SOURCE_REVISION, "cpu_only": True, "frame_cache_limit": FRAME_CACHE_LIMIT,
                 "persistent_images": False, "persistent_logs": False, "native_input": False,
                 "capture_source": "synthetic", "custom_controller": "input callbacks disabled",
-                "cancellation": "passed", "replacement_probe": REPLACEMENT_PROBE}
-    _require(payload == {"ok": True, "report": expected}, "Frozen source-built SDK replacement diagnostic did not pass.")
+                "cancellation": "passed", "replacement_probe": REPLACEMENT_PROBE,
+                "synthetic_template_match": "passed"}
+    report = payload.get("report")
+    if label == "windows-x64":
+        from afk_grinder.recognition.windows_loader import validate_windows_sdk_loads
+        _require(type(report) is dict and "windows_sdk_loads" in report,
+                 "Frozen Windows SDK load observation is missing.")
+        expected["windows_sdk_loads"] = validate_windows_sdk_loads(copy, report["windows_sdk_loads"])
+    _require(set(payload) == {"ok", "report"} and payload["ok"] is True and type(report) is dict
+             and set(report) == set(expected)
+             and all(type(report[key]) is type(value) and report[key] == value for key, value in expected.items()),
+             "Frozen source-built SDK replacement diagnostic did not pass.")
     loaded = set()
     if label != "windows-x64":
         root = copy.resolve(strict=True)
@@ -294,11 +321,13 @@ def verify(label: str, bundle: Path, work: Path, output: Path, commit: str) -> d
     after = _snapshot(bundle, label)
     _require(before == after, "Original application changed during the private replacement test.")
     sources = json.loads((prepared / "sdk_sources.json").read_text(encoding="utf-8"))
-    receipt = {"schema_version": 1, "label": label, "source_commit": commit, "sdk_version": PINNED_MAA_VERSION,
+    receipt = {"schema_version": 2, "label": label, "source_commit": commit, "sdk_version": PINNED_MAA_VERSION,
                "cmake_version": cmake_version, "sources": [{key: item[key] for key in ("name", "commit", "sha256")} for item in sources["components"]],
                "binary_build_dependency": {"url": dependency.url, "sha256": dependency.sha256, "triplet": dependency.triplet},
                "probe_source_original_sha256": _SOURCE_SHA256, "probe_source_modified_sha256": _hash(probe_source),
                "libraries": records, "sdk_report": sdk_report, "mac_loaded_sdk_libraries": loaded,
+               "windows_sdk_loads": sdk_report.get("windows_sdk_loads"),
+               "loader_evidence_scope": "Observed synthetic replacement worker only; not all possible lazy imports.",
                "originals_before": before, "originals_after": after, "originals_unchanged": True,
                "signature": "not modified on Windows" if label == "windows-x64" else "local ad-hoc; deep strict verified",
                "screen_capture": False, "native_input": False, "sdk_publication_gate": "closed"}

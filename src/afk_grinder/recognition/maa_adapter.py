@@ -129,6 +129,37 @@ def _probe_replacement_marker(library: Any) -> str:
     return REPLACEMENT_PROBE
 
 
+def _probe_replacement_template() -> None:
+    """Exercise the modified core with an original, in-memory template."""
+    from .matcher import TemplateHit, TemplateMatcher, TemplateSpec
+
+    texture = bytes((index * 37 + index // 17 * 13) % 256 for index in range(16 * 16 * 3))
+    frame = bytearray(bytes((3, 7, 11)) * (96 * 64))
+    for row in range(16):
+        offset = ((9 + row) * 96 + 11) * 3
+        frame[offset:offset + 48] = texture[row * 48:(row + 1) * 48]
+    matcher = TemplateMatcher([TemplateSpec("sdk-replacement", 16, 16, texture, (0, 0, 96, 64), .97)])
+    try:
+        matcher.warmup()
+        hits = matcher.match(96, 64, bytes(frame), timeout=2)
+        if (type(hits) is not tuple or len(hits) != 1 or type(hits[0]) is not TemplateHit
+                or hits[0].template_id != "sdk-replacement" or hits[0].box != (11, 9, 16, 16)
+                or type(hits[0].score) not in (int, float) or not math.isfinite(hits[0].score)
+                or not .97 <= hits[0].score <= 1):
+            raise SDKError("Source-built SDK synthetic template check failed.")
+    finally:
+        matcher.close()
+
+
+def _windows_replacement_loads() -> dict[str, Any]:
+    """Observe this frozen worker's SDK origins; never inspect another process."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        raise SDKError("Windows replacement load observation requires a frozen worker.")
+    from .windows_loader import observe_windows_sdk_loads
+
+    return observe_windows_sdk_loads(Path(sys.executable).parent)
+
+
 def probe_sdk(*, require_replacement: bool = False) -> dict[str, Any]:
     """Exercise real lifecycle on a synthetic frame, without OS controllers.
 
@@ -192,6 +223,10 @@ def probe_sdk(*, require_replacement: bool = False) -> dict[str, Any]:
         }
         if require_replacement:
             report["replacement_probe"] = _probe_replacement_marker(library)
+            _probe_replacement_template()
+            report["synthetic_template_match"] = "passed"
+            if sys.platform == "win32":
+                report["windows_sdk_loads"] = _windows_replacement_loads()
         return report
     except SDKError:
         raise
