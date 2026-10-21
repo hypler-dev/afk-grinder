@@ -95,6 +95,14 @@ The local synthetic proof evaluated 9 held-out examples: 5 exact label matches,
 excluded outcomes. This is useful compiler/evaluator evidence only. It is not
 an Adopt Me held-out result and does not complete BUILD.md M2.
 
+[CI run 39522539510](https://github.com/hypler-dev/afk-grinder/actions/runs/39522539510)
+passed Windows x64, Mac Apple Silicon, and Intel Mac for source
+`32b6cfda4b745379bc96324b9d61d2a6ed0d82e4`. Every private frozen SDK build
+passes the exact nine expected fixture outcomes; every SDK-free downloadable
+build returns the expected `recognition_failed` result for this demo. All six
+download records passed separate static artifact review. No downloaded app was
+launched or installed, and this does not establish live-game acceptance.
+
 SDK-bearing distribution and installers remain closed. The current app is
 unchanged by this evaluator. No screenshots, replay, model weights, game
 assets, native input, capture, live approval, or publication occurred.
