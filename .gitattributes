@@ -1,3 +1,8 @@
 # Preserve the owner's blueprint and upstream notice bytes on every checkout.
 BUILD.md -text
 licenses/** -text
+
+# Bind pinned source/provenance JSON to identical bytes across build hosts.
+tools/sdk_sources.json -text
+tools/sdk_build_dependencies.json -text
+tools/sdk_native_provenance.json -text

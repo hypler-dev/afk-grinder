@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "scope": "Static Windows vendor/package byte comparison; not source completeness or redistribution approval.",
+  "reference_inventory_commit": "c7e02e4cfd13698b37d15da104e8df750073d5ad",
+  "reference_ci_run": 39531946057,
+  "target": "windows-x64",
+  "source_recipe_pins": {
+    "MaaDeps": "d47e60dfabdbb7bf2a18b305404c889ea2a4bbc7",
+    "vcpkg": "c5a15727ee70fddf0296f0d8aafc3f58916fefac"
+  },
+  "windows_maadeps_archive": {
+    "url": "https://github.com/MaaXYZ/MaaDeps/releases/download/v3.0.0/MaaDeps-x64-windows.tar.xz",
+    "size_bytes": 125763732,
+    "sha256": "3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6",
+    "runtime_dll_hash_size_match": true
+  },
+  "components": [
+    {
+      "component": "DirectML",
+      "archive": {
+        "filename": "directml.nupkg",
+        "url": "https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML/1.15.4",
+        "size_bytes": 202292617,
+        "sha256": "4e7cb7ddce8cf837a7a75dc029209b520ca0101470fcdf275c1f49736a3615b9",
+        "recipe_sha512": "fde767f56904abc90fd53f65d8729c918ab7f6e3c5e1ecdd479908fc02b4535cf2b0860f7ab2acb9b731d6cb809b72c3d5d4d02853fb8f5ea022a47bc44ef285"
+      },
+      "member": "bin/x64-win/DirectML.dll",
+      "native_path": "_internal/maa/bin/DirectML.dll",
+      "size_bytes": 18527776,
+      "sha256": "9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1",
+      "inventory_hash_size_match": true,
+      "notices": [
+        {
+          "file": "Microsoft-DirectML-1.15.4-LICENSE.txt",
+          "sha256": "a05138e3a085ff60a44881eedfa58dccb03ecc1d7b1f6ae888418e8c2fec4b8d"
+        }
+      ],
+      "source_evidence": "vendor-binary-source-unresolved",
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved."
+      ]
+    },
+    {
+      "component": "ViGEmClient",
+      "archive": {
+        "filename": "vgamepad-0.1.0.tar.gz",
+        "url": "https://files.pythonhosted.org/packages/source/v/vgamepad/vgamepad-0.1.0.tar.gz",
+        "size_bytes": 1174896,
+        "sha256": "57f6bd01aec0c172947517fb782d150ef9b285f7f4d524c317374fa5c24a89de",
+        "recipe_sha512": "85c856979d77fa05b20e9fa10571f85b9be3c63fed5600e8f52cc86563513d8df11c647ae655ceab0b9940fbc7e653389713aa2aef4ba97a67bf3cfb2b6eb3d0"
+      },
+      "member": "vgamepad-0.1.0/vgamepad/win/vigem/client/x64/ViGEmClient.dll",
+      "native_path": "_internal/maa/bin/ViGEmClient.dll",
+      "size_bytes": 130048,
+      "sha256": "2bf0cb1d809039573c922737d298a1653d4dbc61408060ff45a9bcfde82e97d2",
+      "inventory_hash_size_match": true,
+      "notices": [
+        {
+          "file": "vgamepad-0.1.0-LICENSE.txt",
+          "sha256": "777ec45017bfb1c95fcb259ef0601e8c59ed40d22512443b4019262b226cf635"
+        },
+        {
+          "file": "ViGEmClient-b66d02d-LICENSE.txt",
+          "sha256": "445b3bccd103d39cab7e9b276dd966d60269cf5c44b4b8a118e48bc4c7c4f0db"
+        }
+      ],
+      "source_evidence": "vendor-binary-source-unresolved",
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved.",
+        "Upstream notice revision b66d02d is not attested as the source revision that built this DLL; no driver is installed or executed."
+      ]
+    },
+    {
+      "component": "DXCompiler",
+      "archive": {
+        "filename": "dxc_2026_05_27.zip",
+        "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602.24/dxc_2026_05_27.zip",
+        "size_bytes": 27108038,
+        "sha256": "cf658aacf070d3045e31b8f1f8a696c2945f37c1095019481ef7c513368db3b4",
+        "recipe_sha512": "cf331112f1753fca68525c85bb4964714d85dbf7cb5e41af4720bbdffefdfddad1878c7a1a74898e2105dff32957a526d188d9ee3f18f0df310ec8548827a374"
+      },
+      "member": "bin/x64/dxcompiler.dll",
+      "native_path": "_internal/maa/bin/dxcompiler.dll",
+      "size_bytes": 17987384,
+      "sha256": "9b5e10ed756c461b4ec2c83a99f1d6ace20e97826e9c0b0e966b7b1cd6f2aec6",
+      "inventory_hash_size_match": true,
+      "notices": [
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-SOURCE-LICENSE.txt",
+          "sha256": "27a49e35d1da96eba18fba54bc882667ff0ff8c0254f16f2b6e165d605ba7df8"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-LLVM.txt",
+          "sha256": "729615317e28dd03907e46f0fc3b5e88f7853cee61d1a1471d2749335516b46f"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MIT.txt",
+          "sha256": "903df5512f7d02609fed0c780a9b704f5a3eeb6e4d84ebe42a29845c81899a3c"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MS.txt",
+          "sha256": "734f72f239fe7b07b4c7203f294c1a7ce27095687278bab7e56d630d7c672963"
+        }
+      ],
+      "source_evidence": "recipe-only",
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage.",
+        "Source and binary release notices have mixed terms, including Microsoft binary terms; do not relicense under MIT."
+      ]
+    },
+    {
+      "component": "DXIL",
+      "archive": {
+        "filename": "dxc_2026_05_27.zip",
+        "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602.24/dxc_2026_05_27.zip",
+        "size_bytes": 27108038,
+        "sha256": "cf658aacf070d3045e31b8f1f8a696c2945f37c1095019481ef7c513368db3b4",
+        "recipe_sha512": "cf331112f1753fca68525c85bb4964714d85dbf7cb5e41af4720bbdffefdfddad1878c7a1a74898e2105dff32957a526d188d9ee3f18f0df310ec8548827a374"
+      },
+      "member": "bin/x64/dxil.dll",
+      "native_path": "_internal/maa/bin/dxil.dll",
+      "size_bytes": 1503072,
+      "sha256": "cbcfe883a09fd0ca1f98abdf3a9553b560895e3283a136da82a8381253a169df",
+      "inventory_hash_size_match": true,
+      "notices": [
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-SOURCE-LICENSE.txt",
+          "sha256": "27a49e35d1da96eba18fba54bc882667ff0ff8c0254f16f2b6e165d605ba7df8"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-LLVM.txt",
+          "sha256": "729615317e28dd03907e46f0fc3b5e88f7853cee61d1a1471d2749335516b46f"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MIT.txt",
+          "sha256": "903df5512f7d02609fed0c780a9b704f5a3eeb6e4d84ebe42a29845c81899a3c"
+        },
+        {
+          "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MS.txt",
+          "sha256": "734f72f239fe7b07b4c7203f294c1a7ce27095687278bab7e56d630d7c672963"
+        }
+      ],
+      "source_evidence": "vendor-binary-source-unresolved",
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved.",
+        "Source and binary release notices have mixed terms, including Microsoft binary terms; do not relicense under MIT."
+      ]
+    }
+  ],
+  "sdk_publication_gate": "closed",
+  "executed_software": false,
+  "installed_driver": false,
+  "source_coverage_complete": false
+}

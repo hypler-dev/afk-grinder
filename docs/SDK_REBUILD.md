@@ -2,6 +2,8 @@
 
 Authority: [intent.md](../intent.md). Distribution gate: [DEPENDENCIES.md](DEPENDENCIES.md#sdk-bearing-distribution-gate). Current evidence: [plan.md](../plan.md).
 
+The separate [native notice traceability procedure](SDK_NATIVE_TRACEABILITY.md) checks direct SDK content groups, complete aliases, retained/bundled notice bytes and members in the same four pinned source archives. It does not replace the native source-replacement experiment or establish complete corresponding dependency source. Both evidence paths keep publication closed.
+
 This developer-only tooling supports a private frozen-copy experiment. It does not publish SDK binaries, install an application, grant macOS permissions, capture a window, send native input, or change the downloadable prototype. The verifier requires a matching host process: `macos-arm64` on arm64 macOS, `macos-x64` on x64 macOS, or `windows-x64` on Windows AMD64. A mismatched target label is rejected; physical hardware and emulation status are not independently attested.
 
 ## Prepare pinned sources

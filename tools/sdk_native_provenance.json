@@ -1,0 +1,484 @@
+{
+  "schema_version": 1,
+  "scope": "direct-sdk-native-notice-traceability",
+  "sdk_version": "5.14.3",
+  "reference_inventory_commit": "c7e02e4cfd13698b37d15da104e8df750073d5ad",
+  "source_manifest_sha256": "0c52b7da46d06f8ed710603f356d040876fbbb243af77ed1c7b009255d8cfbe6",
+  "build_dependency_manifest_sha256": "c99497419744c42ebe276f689c2707bffc6b496b9b770bf4f9d0922a732f885d",
+  "components": {
+    "MaaFramework": {
+      "source_component": "MaaFramework",
+      "source_evidence": "pinned-source-archive",
+      "identity": "MaaFramework 5.14.3",
+      "recipes": [
+        {
+          "path": "source/MaaFramework/CMakeLists.txt",
+          "sha256": "b86a6229ef6be7cd838b408b1429ae29b5e05c320d347ca6e0c91c5ac74b4712"
+        }
+      ],
+      "notices": [
+        "MaaFramework-LGPL-3.0.md",
+        "GPL-3.0.txt"
+      ],
+      "limitations": [
+        "Dependency source and final distribution review remain open."
+      ]
+    },
+    "MaaUtils": {
+      "source_component": "MaaUtils",
+      "source_evidence": "pinned-source-archive",
+      "identity": "MaaUtils f8994a38ddc6858800dfea8a04e958a0adbfb184",
+      "recipes": [
+        {
+          "path": "source/CMakeLists.txt",
+          "sha256": "dcab82e1ad22fb2eabe86a7795d8c5cfef620db7768ae2b8e2cbfbee7d24a2f9"
+        }
+      ],
+      "notices": [
+        "MaaFramework-LGPL-3.0.md",
+        "GPL-3.0.txt"
+      ],
+      "limitations": [
+        "Dependency source and final distribution review remain open."
+      ]
+    },
+    "MaaCustomControlUnit": {
+      "source_component": "MaaFramework",
+      "source_evidence": "pinned-source-archive",
+      "identity": "MaaCustomControlUnit from MaaFramework 5.14.3",
+      "recipes": [
+        {
+          "path": "source/MaaCustomControlUnit/CMakeLists.txt",
+          "sha256": "435127202041e0c810af749e1161395ebcff60ec1f899619a89fc60afc52d77b"
+        }
+      ],
+      "notices": [
+        "MaaFramework-LGPL-3.0.md",
+        "GPL-3.0.txt"
+      ],
+      "limitations": [
+        "Dependency source and final distribution review remain open."
+      ]
+    },
+    "FastDeploy": {
+      "source_component": "MaaDeps",
+      "source_evidence": "recipe-only",
+      "identity": "Maa FastDeploy recipe 1.0.7; e11935e4595360e7038573db1a7ab08dd0e096ec",
+      "recipes": [
+        {
+          "path": "vcpkg-overlay/ports/maa-fastdeploy/portfile.cmake",
+          "sha256": "8b0f900c230b0e4e53ef403e03a4f928936c603d156e3d371c31a8feea8989db"
+        },
+        {
+          "path": "vcpkg-overlay/ports/maa-fastdeploy/vcpkg.json",
+          "sha256": "f4de59ab7a374d91c2f032fbe51bd0ba22c781db5c981bbf5f1708283754c51d"
+        }
+      ],
+      "notices": [
+        "MaaDeps-maa-fastdeploy-copyright.txt"
+      ],
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage."
+      ]
+    },
+    "ONNXRuntime": {
+      "source_component": "MaaDeps",
+      "source_evidence": "recipe-only",
+      "identity": "Maa ONNX Runtime 1.29.0",
+      "recipes": [
+        {
+          "path": "vcpkg-overlay/ports/maa-onnxruntime/portfile.cmake",
+          "sha256": "4fa774390cd44c4babf1f43166782cea5ad8852450cc8f59be14cd0f59525c16"
+        },
+        {
+          "path": "vcpkg-overlay/ports/maa-onnxruntime/vcpkg.json",
+          "sha256": "b0fa0ed97a888b31f9f6ee84d3e650ea7b708883f568ea798c2be5043df3c79f"
+        }
+      ],
+      "notices": [
+        "MaaDeps-maa-onnxruntime-copyright.txt"
+      ],
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage."
+      ]
+    },
+    "OpenCV": {
+      "source_component": "vcpkg",
+      "source_evidence": "recipe-only",
+      "identity": "OpenCV 4.12.0 port revision 9",
+      "recipes": [
+        {
+          "path": "ports/opencv4/portfile.cmake",
+          "sha256": "59ed58b3314d3cb92a59c8d553c27184eb1f968cd50970b0f62150a19e0f35a6"
+        },
+        {
+          "path": "ports/opencv4/vcpkg.json",
+          "sha256": "6124c940814b7a9aae0af97564f4e6052b8e809d70ef85ddd4a7c0e79e1eb7a0"
+        }
+      ],
+      "notices": [
+        "MaaDeps-opencv4-copyright.txt"
+      ],
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage."
+      ]
+    },
+    "Dawn": {
+      "source_component": "MaaDeps",
+      "source_evidence": "recipe-only",
+      "identity": "Dawn v20260817.213942",
+      "recipes": [
+        {
+          "path": "vcpkg-overlay/ports/dawn/portfile.cmake",
+          "sha256": "7376d0f3ad4907a40399b9fa2cdce4958b15155319b46e2a540bb52b96e333ac"
+        },
+        {
+          "path": "vcpkg-overlay/ports/dawn/vcpkg.json",
+          "sha256": "35052a5509abc6f73637e974226c17bcfdcb28ef92f0ebdaddd9862534872ed3"
+        }
+      ],
+      "notices": [
+        "MaaDeps-dawn-copyright.txt"
+      ],
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage."
+      ]
+    },
+    "DirectML": {
+      "source_component": "MaaDeps",
+      "source_evidence": "vendor-binary-source-unresolved",
+      "identity": "Microsoft.AI.DirectML 1.15.4 redistributable binary",
+      "recipes": [
+        {
+          "path": "vcpkg-overlay/ports/directml-bin/portfile.cmake",
+          "sha256": "0ae331fd17338d1bb8c4587d29117bc3b1847db2decec1c469cc201a9c1b7c8c"
+        },
+        {
+          "path": "vcpkg-overlay/ports/directml-bin/vcpkg.json",
+          "sha256": "e0ae7c28b3c5129d7a8ff2b2e4e004e4276f4b8a3620a33e7f7434ab80d8a609"
+        }
+      ],
+      "notices": [
+        "Microsoft-DirectML-1.15.4-LICENSE.txt"
+      ],
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved."
+      ]
+    },
+    "ViGEmClient": {
+      "source_component": "MaaDeps",
+      "source_evidence": "vendor-binary-source-unresolved",
+      "identity": "ViGEmClient.dll supplied by vgamepad 0.1.0; exact compiled source revision unresolved",
+      "recipes": [
+        {
+          "path": "vcpkg-overlay/ports/vgamepad-bin/portfile.cmake",
+          "sha256": "1bb26524961b77f013f1a6da99a6b55c14f7c5a11b3d9f3d067c58ab1cd3fb2a"
+        },
+        {
+          "path": "vcpkg-overlay/ports/vgamepad-bin/vcpkg.json",
+          "sha256": "6edb15f0433c0b7af62f0ee80bb8801b7aeb0e4eb00ed786c104ec81b898fac0"
+        }
+      ],
+      "notices": [
+        "vgamepad-0.1.0-LICENSE.txt",
+        "ViGEmClient-b66d02d-LICENSE.txt"
+      ],
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved.",
+        "Upstream notice revision b66d02d is not attested as the source revision that built this DLL; no driver is installed or executed."
+      ]
+    },
+    "DXCompiler": {
+      "source_component": "vcpkg",
+      "source_evidence": "recipe-only",
+      "identity": "Microsoft DirectX Shader Compiler v1.9.2602.24; binary release 2026_05_27",
+      "recipes": [
+        {
+          "path": "ports/directx-dxc/portfile.cmake",
+          "sha256": "5c67ff595ba11fa5ed0f63e4f19a4e8327c0515e3cd793d1ae96a3ee563e0f2d"
+        },
+        {
+          "path": "ports/directx-dxc/vcpkg.json",
+          "sha256": "07644f91eddadf7504300ccb14f2ec2ad62c1ff0674d5392c8c4a687f3db5b2f"
+        }
+      ],
+      "notices": [
+        "Microsoft-DXC-v1.9.2602.24-SOURCE-LICENSE.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-LLVM.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-MIT.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-MS.txt"
+      ],
+      "limitations": [
+        "Recipe evidence is not corresponding dependency source or complete embedded-component notice coverage.",
+        "Source and binary release notices have mixed terms, including Microsoft binary terms; do not relicense under MIT."
+      ]
+    },
+    "DXIL": {
+      "source_component": "vcpkg",
+      "source_evidence": "vendor-binary-source-unresolved",
+      "identity": "DXIL validator supplied by DirectX Shader Compiler v1.9.2602.24",
+      "recipes": [
+        {
+          "path": "ports/directx-dxc/portfile.cmake",
+          "sha256": "5c67ff595ba11fa5ed0f63e4f19a4e8327c0515e3cd793d1ae96a3ee563e0f2d"
+        },
+        {
+          "path": "ports/directx-dxc/vcpkg.json",
+          "sha256": "07644f91eddadf7504300ccb14f2ec2ad62c1ff0674d5392c8c4a687f3db5b2f"
+        }
+      ],
+      "notices": [
+        "Microsoft-DXC-v1.9.2602.24-SOURCE-LICENSE.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-LLVM.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-MIT.txt",
+        "Microsoft-DXC-v1.9.2602.24-LICENSE-MS.txt"
+      ],
+      "limitations": [
+        "Vendor/package terms are separate from project MIT; corresponding-source and redistribution review remain unresolved.",
+        "Source and binary release notices have mixed terms, including Microsoft binary terms; do not relicense under MIT."
+      ]
+    }
+  },
+  "targets": {
+    "macos-arm64": [
+      {
+        "component": "MaaUtils",
+        "paths": [
+          "Contents/Frameworks/libMaaUtils.dylib",
+          "Contents/Frameworks/maa/bin/libMaaUtils.dylib",
+          "Contents/Resources/libMaaUtils.dylib",
+          "Contents/Resources/maa/bin/libMaaUtils.dylib"
+        ],
+        "sha256": "835ef754ab0a92d9c620adeae5ee00eefa926713abc69053b951bdc4e320ea08",
+        "size_bytes": 692768
+      },
+      {
+        "component": "FastDeploy",
+        "paths": [
+          "Contents/Frameworks/libfastdeploy_ppocr.dylib",
+          "Contents/Frameworks/maa/bin/libfastdeploy_ppocr.dylib",
+          "Contents/Resources/libfastdeploy_ppocr.dylib",
+          "Contents/Resources/maa/bin/libfastdeploy_ppocr.dylib"
+        ],
+        "sha256": "a91e9bf1f6ff800e9b8c8bfd67cfa0e0adff0bb7fbe882646aae671ca7f7cb6a",
+        "size_bytes": 5033376
+      },
+      {
+        "component": "ONNXRuntime",
+        "paths": [
+          "Contents/Frameworks/libonnxruntime.1.29.0.dylib",
+          "Contents/Frameworks/maa/bin/libonnxruntime.1.29.0.dylib",
+          "Contents/Resources/libonnxruntime.1.29.0.dylib",
+          "Contents/Resources/maa/bin/libonnxruntime.1.29.0.dylib"
+        ],
+        "sha256": "1b93223668115cf7c5af690c8ce7d6ee8f36f68577eaa0ad9c4fc871e47a4ade",
+        "size_bytes": 19442080
+      },
+      {
+        "component": "OpenCV",
+        "paths": [
+          "Contents/Frameworks/libopencv_world4.4.12.0.dylib",
+          "Contents/Frameworks/maa/bin/libopencv_world4.4.12.0.dylib",
+          "Contents/Resources/libopencv_world4.4.12.0.dylib",
+          "Contents/Resources/maa/bin/libopencv_world4.4.12.0.dylib"
+        ],
+        "sha256": "ff10c142377c44177e0faeedd35a4589a0b8eb87ada8162a194e9ff58cb931e2",
+        "size_bytes": 8963136
+      },
+      {
+        "component": "Dawn",
+        "paths": [
+          "Contents/Frameworks/libwebgpu_dawn.dylib",
+          "Contents/Frameworks/maa/bin/libwebgpu_dawn.dylib",
+          "Contents/Resources/libwebgpu_dawn.dylib",
+          "Contents/Resources/maa/bin/libwebgpu_dawn.dylib"
+        ],
+        "sha256": "f29cdb9521babb03f1ef895ce548c0a3635a4a4f9ae5e74757508424445af4ae",
+        "size_bytes": 6666544
+      },
+      {
+        "component": "MaaCustomControlUnit",
+        "paths": [
+          "Contents/Frameworks/maa/bin/libMaaCustomControlUnit.dylib",
+          "Contents/Resources/maa/bin/libMaaCustomControlUnit.dylib"
+        ],
+        "sha256": "239332931362387d72a8484db25a02ec53ce4ec073ad3ac3681a48aa1a4f9f8b",
+        "size_bytes": 271888
+      },
+      {
+        "component": "MaaFramework",
+        "paths": [
+          "Contents/Frameworks/maa/bin/libMaaFramework.dylib",
+          "Contents/Resources/maa/bin/libMaaFramework.dylib"
+        ],
+        "sha256": "b229e47b8a106e731e265b07d4108f74e267c3fe3eb001ea08029299b7f93bed",
+        "size_bytes": 4031696
+      }
+    ],
+    "macos-x64": [
+      {
+        "component": "MaaUtils",
+        "paths": [
+          "Contents/Frameworks/libMaaUtils.dylib",
+          "Contents/Frameworks/maa/bin/libMaaUtils.dylib",
+          "Contents/Resources/libMaaUtils.dylib",
+          "Contents/Resources/maa/bin/libMaaUtils.dylib"
+        ],
+        "sha256": "a7badaddc0502c9bd8e745f8fc75f2e396df2a6caaafb9e8289b9c394157c0ce",
+        "size_bytes": 712288
+      },
+      {
+        "component": "FastDeploy",
+        "paths": [
+          "Contents/Frameworks/libfastdeploy_ppocr.dylib",
+          "Contents/Frameworks/maa/bin/libfastdeploy_ppocr.dylib",
+          "Contents/Resources/libfastdeploy_ppocr.dylib",
+          "Contents/Resources/maa/bin/libfastdeploy_ppocr.dylib"
+        ],
+        "sha256": "b60f8efd9b01605608baf1b3b98ff257891c4fcf8c536ac9087ac55b82c82ddc",
+        "size_bytes": 5621408
+      },
+      {
+        "component": "ONNXRuntime",
+        "paths": [
+          "Contents/Frameworks/libonnxruntime.1.29.0.dylib",
+          "Contents/Frameworks/maa/bin/libonnxruntime.1.29.0.dylib",
+          "Contents/Resources/libonnxruntime.1.29.0.dylib",
+          "Contents/Resources/maa/bin/libonnxruntime.1.29.0.dylib"
+        ],
+        "sha256": "0ecaab1d27021bab5aee3114f910c9faa2ddece85646e7ddeb107a37e05de6f1",
+        "size_bytes": 22358688
+      },
+      {
+        "component": "OpenCV",
+        "paths": [
+          "Contents/Frameworks/libopencv_world4.4.12.0.dylib",
+          "Contents/Frameworks/maa/bin/libopencv_world4.4.12.0.dylib",
+          "Contents/Resources/libopencv_world4.4.12.0.dylib",
+          "Contents/Resources/maa/bin/libopencv_world4.4.12.0.dylib"
+        ],
+        "sha256": "5a745b639e5cba6611015fd4a0d4821bb64a18056ad127a26e205b9fa8624a36",
+        "size_bytes": 10309152
+      },
+      {
+        "component": "Dawn",
+        "paths": [
+          "Contents/Frameworks/libwebgpu_dawn.dylib",
+          "Contents/Frameworks/maa/bin/libwebgpu_dawn.dylib",
+          "Contents/Resources/libwebgpu_dawn.dylib",
+          "Contents/Resources/maa/bin/libwebgpu_dawn.dylib"
+        ],
+        "sha256": "43dbed7906c1fd5b189eb739048c13954fc846b7367342658d236c1ef891275f",
+        "size_bytes": 8114272
+      },
+      {
+        "component": "MaaCustomControlUnit",
+        "paths": [
+          "Contents/Frameworks/maa/bin/libMaaCustomControlUnit.dylib",
+          "Contents/Resources/maa/bin/libMaaCustomControlUnit.dylib"
+        ],
+        "sha256": "464048f7d80cb6dc26fab52a391f78b6dee83243cdd19ebd23b6db0458623dfa",
+        "size_bytes": 256944
+      },
+      {
+        "component": "MaaFramework",
+        "paths": [
+          "Contents/Frameworks/maa/bin/libMaaFramework.dylib",
+          "Contents/Resources/maa/bin/libMaaFramework.dylib"
+        ],
+        "sha256": "8cf957544db6168e1a899e7c505322c8ac850cdf907e6a5eb86d284f692272bd",
+        "size_bytes": 4414768
+      }
+    ],
+    "windows-x64": [
+      {
+        "component": "DirectML",
+        "paths": [
+          "_internal/maa/bin/DirectML.dll"
+        ],
+        "sha256": "9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1",
+        "size_bytes": 18527776
+      },
+      {
+        "component": "MaaCustomControlUnit",
+        "paths": [
+          "_internal/maa/bin/MaaCustomControlUnit.dll"
+        ],
+        "sha256": "cff748b5ff1ef62d6c66e1c91c2ad67f797c1be546305dd4b4a52c0378ff0e6b",
+        "size_bytes": 315392
+      },
+      {
+        "component": "MaaFramework",
+        "paths": [
+          "_internal/maa/bin/MaaFramework.dll"
+        ],
+        "sha256": "7085fedcaae06d7521020edfe8c3a3f9545986877e1b4a4bb8cf0188b39f97be",
+        "size_bytes": 2581504
+      },
+      {
+        "component": "MaaUtils",
+        "paths": [
+          "_internal/maa/bin/MaaUtils.dll"
+        ],
+        "sha256": "f71d437832891eb998369dffa0e2f96ac1663bdc7492589a088e90db2816bd71",
+        "size_bytes": 631808
+      },
+      {
+        "component": "ViGEmClient",
+        "paths": [
+          "_internal/maa/bin/ViGEmClient.dll"
+        ],
+        "sha256": "2bf0cb1d809039573c922737d298a1653d4dbc61408060ff45a9bcfde82e97d2",
+        "size_bytes": 130048
+      },
+      {
+        "component": "DXCompiler",
+        "paths": [
+          "_internal/maa/bin/dxcompiler.dll"
+        ],
+        "sha256": "9b5e10ed756c461b4ec2c83a99f1d6ace20e97826e9c0b0e966b7b1cd6f2aec6",
+        "size_bytes": 17987384
+      },
+      {
+        "component": "DXIL",
+        "paths": [
+          "_internal/maa/bin/dxil.dll"
+        ],
+        "sha256": "cbcfe883a09fd0ca1f98abdf3a9553b560895e3283a136da82a8381253a169df",
+        "size_bytes": 1503072
+      },
+      {
+        "component": "FastDeploy",
+        "paths": [
+          "_internal/maa/bin/fastdeploy_ppocr_maa.dll"
+        ],
+        "sha256": "a7d12e9b0e7bb6257a67b56051823502dcb474a40e5911d4cbbbdd50f0606085",
+        "size_bytes": 1222656
+      },
+      {
+        "component": "ONNXRuntime",
+        "paths": [
+          "_internal/maa/bin/onnxruntime_maa.dll"
+        ],
+        "sha256": "56e9d7d3beaad24e2ce79885201fe19f1b4dbdf511cf1d4bcb03549999c604dc",
+        "size_bytes": 25096704
+      },
+      {
+        "component": "OpenCV",
+        "paths": [
+          "_internal/maa/bin/opencv_world4_maa.dll"
+        ],
+        "sha256": "132c00f39772159ec6f3586e662f9996f725429f72ae42af603b97aa80acaceb",
+        "size_bytes": 9276416
+      },
+      {
+        "component": "Dawn",
+        "paths": [
+          "_internal/maa/bin/webgpu_dawn_maa.dll"
+        ],
+        "sha256": "3d492640ec3253ee7277ba7d2f7e5b78669e0b32f3a1ce1fe3d544f29624279c",
+        "size_bytes": 6863872
+      }
+    ]
+  }
+}

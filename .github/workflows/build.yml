@@ -12,6 +12,7 @@ on:
       - "LICENSE"
       - "THIRD_PARTY_NOTICES.md"
       - "licenses/**"
+      - ".gitattributes"
       - ".github/workflows/build.yml"
   pull_request:
     branches: [main]
@@ -24,6 +25,7 @@ on:
       - "LICENSE"
       - "THIRD_PARTY_NOTICES.md"
       - "licenses/**"
+      - ".gitattributes"
       - ".github/workflows/build.yml"
   workflow_dispatch:
     inputs:
@@ -116,6 +118,26 @@ jobs:
           uv run --locked --extra build --extra recognition python -m tools.inventory_build
           --label '${{ matrix.label }}' --commit "$GITHUB_SHA"
           --output build-evidence/sdk-inventory.json --require-sdk
+
+      - name: Prepare pinned source archives for SDK notice traceability
+        run: >-
+          uv run --locked --extra build --extra recognition python -m tools.fetch_sdk_sources
+          --destination build/sdk-traceability-sources
+
+      - name: Bind SDK native files to notices and pinned source recipes
+        run: >-
+          uv run --locked --extra build --extra recognition python -m tools.sdk_native_provenance
+          --inventory build-evidence/sdk-inventory.json --sources build/sdk-traceability-sources
+          --label '${{ matrix.label }}' --commit "$GITHUB_SHA"
+          --output build-evidence/sdk-native-provenance.json
+
+      - name: Upload SDK native notice traceability as JSON only
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SDK-traceability-${{ matrix.label }}-${{ github.sha }}
+          path: build-evidence/sdk-native-provenance.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify source-built SDK replacement in a private copy
         if: github.event_name == 'workflow_dispatch' && inputs.verify_source_replacement

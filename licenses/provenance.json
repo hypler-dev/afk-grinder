@@ -520,6 +520,50 @@
       "file": "Pillow-13.0.0.txt",
       "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce",
       "source": "Pillow 13.0.0 official PyPI wheel, pillow-13.0.0.dist-info/licenses/LICENSE; https://pypi.org/project/pillow/13.0.0/"
+    },
+    {
+      "file": "Microsoft-DirectML-1.15.4-LICENSE.txt",
+      "sha256": "a05138e3a085ff60a44881eedfa58dccb03ecc1d7b1f6ae888418e8c2fec4b8d",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.4/microsoft.ai.directml.1.15.4.nupkg sha512 fde767f56904abc90fd53f65d8729c918ab7f6e3c5e1ecdd479908fc02b4535cf2b0860f7ab2acb9b731d6cb809b72c3d5d4d02853fb8f5ea022a47bc44ef285: LICENSE.txt",
+      "additional_sources": [
+        "Pinned MaaDeps v3.0.0 Windows archive sha256 3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6: vcpkg/installed/maa-x64-windows/share/directml-bin/copyright"
+      ]
+    },
+    {
+      "file": "Microsoft-DXC-v1.9.2602.24-SOURCE-LICENSE.txt",
+      "sha256": "27a49e35d1da96eba18fba54bc882667ff0ff8c0254f16f2b6e165d605ba7df8",
+      "source": "https://raw.githubusercontent.com/microsoft/DirectXShaderCompiler/v1.9.2602.24/LICENSE.TXT",
+      "additional_sources": [
+        "Pinned MaaDeps v3.0.0 Windows archive sha256 3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6: vcpkg/installed/maa-x64-windows/share/directx-dxc/copyright"
+      ]
+    },
+    {
+      "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-LLVM.txt",
+      "sha256": "729615317e28dd03907e46f0fc3b5e88f7853cee61d1a1471d2749335516b46f",
+      "source": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602.24/dxc_2026_05_27.zip: LICENSE-LLVM.txt; archive sha512 cf331112f1753fca68525c85bb4964714d85dbf7cb5e41af4720bbdffefdfddad1878c7a1a74898e2105dff32957a526d188d9ee3f18f0df310ec8548827a374"
+    },
+    {
+      "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MIT.txt",
+      "sha256": "903df5512f7d02609fed0c780a9b704f5a3eeb6e4d84ebe42a29845c81899a3c",
+      "source": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602.24/dxc_2026_05_27.zip: LICENSE-MIT.txt; archive sha512 cf331112f1753fca68525c85bb4964714d85dbf7cb5e41af4720bbdffefdfddad1878c7a1a74898e2105dff32957a526d188d9ee3f18f0df310ec8548827a374"
+    },
+    {
+      "file": "Microsoft-DXC-v1.9.2602.24-LICENSE-MS.txt",
+      "sha256": "734f72f239fe7b07b4c7203f294c1a7ce27095687278bab7e56d630d7c672963",
+      "source": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602.24/dxc_2026_05_27.zip: LICENSE-MS.txt; archive sha512 cf331112f1753fca68525c85bb4964714d85dbf7cb5e41af4720bbdffefdfddad1878c7a1a74898e2105dff32957a526d188d9ee3f18f0df310ec8548827a374"
+    },
+    {
+      "file": "vgamepad-0.1.0-LICENSE.txt",
+      "sha256": "777ec45017bfb1c95fcb259ef0601e8c59ed40d22512443b4019262b226cf635",
+      "source": "https://files.pythonhosted.org/packages/source/v/vgamepad/vgamepad-0.1.0.tar.gz sha512 85c856979d77fa05b20e9fa10571f85b9be3c63fed5600e8f52cc86563513d8df11c647ae655ceab0b9940fbc7e653389713aa2aef4ba97a67bf3cfb2b6eb3d0: vgamepad-0.1.0/LICENSE",
+      "additional_sources": [
+        "Pinned MaaDeps v3.0.0 Windows archive sha256 3638891ca4b9424808598ab917ef73d8811b235ef2dd2246e3af25edd416dfd6: vcpkg/installed/maa-x64-windows/share/vgamepad-bin/copyright"
+      ]
+    },
+    {
+      "file": "ViGEmClient-b66d02d-LICENSE.txt",
+      "sha256": "445b3bccd103d39cab7e9b276dd966d60269cf5c44b4b8a118e48bc4c7c4f0db",
+      "source": "https://github.com/nefarius/ViGEmClient/blob/b66d02d57e32cc8595369c53418b843e958649b4/LICENSE"
     }
   ]
 }
