@@ -261,6 +261,189 @@ class PopupLifecycleTests(unittest.TestCase):
             operation.close()
         self.assertEqual(events.count("close"), 1)
 
+class PopupFailureDiagnosticTests(unittest.TestCase):
+    def make_operation(self, **kwargs):
+        return PopupLifecycleTests.make_operation(self, **kwargs)
+
+    def assert_failure(self, operation, wait, *, guard=lambda: None, expected=None):
+        with self.assertRaises(BaseException) as raised:
+            operation.check(guard, wait)
+        if expected is not None:
+            self.assertIs(raised.exception, expected)
+        payload = operation.failure.as_ipc()
+        self.assertNotIn("/private", repr(payload))
+        self.assertIsNone(operation._capture)
+        self.assertIsNone(operation._recognition)
+        return payload
+
+    def test_model_worker_start_and_warmup_failures_have_distinct_stages(self):
+        from afk_grinder.recognition.service import TIMEOUT_ERROR
+        for location in ("models", "factory", "start", "warmup"):
+            operation, _, wait, _, _, _, _ = self.make_operation()
+            error = RuntimeError("/private/secret/chat")
+            def reject(*_args, **_kwargs): raise error
+            if location == "models":
+                operation.models = reject
+            elif location == "factory":
+                operation.recognition_factory = reject
+            else:
+                original = operation.recognition_factory
+                def factory(*args):
+                    service = original(*args)
+                    if location == "start": service.start = reject
+                    else:
+                        service = SimpleNamespace(ready=False, start=lambda: None,
+                                                  poll=lambda: SimpleNamespace(error=TIMEOUT_ERROR),
+                                                  close=lambda: None)
+                    return service
+                operation.recognition_factory = factory
+            payload = self.assert_failure(operation, wait, expected=error if location != "warmup" else None)
+            self.assertEqual(payload["stage"], {"models": "model_validation", "factory": "worker_start",
+                                               "start": "worker_start", "warmup": "warmup"}[location])
+            self.assertEqual(payload["code"], "worker_timeout" if location == "warmup" else "failed")
+
+    def test_capture_failure_keeps_only_revalidated_capture_metadata(self):
+        from afk_grinder.capture import CaptureDiagnostic
+        for corrupt in (False, True):
+            operation, _, wait, _, _, _, _ = self.make_operation()
+            diagnostic = CaptureDiagnostic("permission", "preflight", "capture_error")
+            if corrupt: object.__setattr__(diagnostic, "stage", "/private/secret/chat")
+            operation.capture_factory = lambda *_args, **_kwargs: SimpleNamespace(
+                poll=lambda: SimpleNamespace(error="/private/secret/chat", frame=None, diagnostic=diagnostic),
+                cancel=lambda: None)
+            payload = self.assert_failure(operation, wait)
+            self.assertEqual((payload["stage"], payload["code"]), ("capture", "failed"))
+            self.assertEqual(payload["capture"], None if corrupt else {
+                "code": "permission", "stage": "preflight", "error_type": "capture_error"})
+
+    def test_capture_and_recognition_staleness_are_distinct(self):
+        for phase in ("capture", "recognition"):
+            holder = {}
+            hook = lambda: setattr(holder["clock"], "value", 100.51)
+            operation, clock, wait, _, reports, records, _ = self.make_operation(
+                **({"capture_hook": hook} if phase == "capture" else {"result_hook": hook}))
+            holder["clock"] = clock
+            payload = self.assert_failure(operation, wait)
+            self.assertEqual((payload["stage"], payload["code"]), (phase + "_freshness", "stale"))
+            self.assertEqual(records, [])
+            self.assertEqual([value[0] for value in reports], ["checking"])
+
+    def test_changed_layout_and_submit_error_do_not_authorize_results(self):
+        for phase in ("layout", "submit"):
+            operation, _, wait, _, reports, records, _ = self.make_operation()
+            error = RuntimeError("/private/secret/chat")
+            if phase == "layout":
+                original = operation.capture_factory
+                def factory(*args, **kwargs):
+                    capture = original(*args, **kwargs)
+                    poll = capture.poll
+                    def moved():
+                        result = poll()
+                        result.frame = replace(result.frame, native_rect=(-800, 40, 800, 600))
+                        return result
+                    capture.poll = moved
+                    return capture
+                operation.capture_factory = factory
+            else:
+                original = operation.recognition_factory
+                def factory(*args):
+                    service = original(*args)
+                    def reject(*_args, **_kwargs): raise error
+                    service.submit = reject
+                    return service
+                operation.recognition_factory = factory
+            payload = self.assert_failure(operation, wait, expected=error if phase == "submit" else None)
+            self.assertEqual((payload["stage"], payload["code"]),
+                             ("content_calibration", "layout_changed") if phase == "layout" else
+                             ("recognition_submit", "failed"))
+            self.assertEqual(records, [])
+            self.assertEqual([value[0] for value in reports], ["checking"])
+
+    def test_worker_result_error_and_deadlines_do_not_expose_messages(self):
+        from afk_grinder.recognition.service import TIMEOUT_ERROR, WORKER_ERROR
+        for error, expected in ((TIMEOUT_ERROR, "worker_timeout"), (WORKER_ERROR, "worker_failed"),
+                                ("/private/secret/chat", "worker_failed")):
+            operation, _, wait, _, _, records, _ = self.make_operation()
+            original = operation.recognition_factory
+            def factory(*args):
+                service = original(*args)
+                service.poll = lambda: SimpleNamespace(error=error)
+                return service
+            operation.recognition_factory = factory
+            payload = self.assert_failure(operation, wait)
+            self.assertEqual((payload["stage"], payload["code"]), ("recognition", expected))
+            self.assertEqual(records, [])
+        holder = {}
+        operation, clock, wait, _, _, _, _ = self.make_operation(
+            warm_hook=lambda: setattr(holder["clock"], "value", 116.))
+        holder["clock"] = clock
+        payload = self.assert_failure(operation, wait)
+        self.assertEqual((payload["stage"], payload["code"]), ("warmup", "timeout"))
+
+    def test_caller_exception_identity_survives_diagnostic_capture(self):
+        from afk_grinder.session import SessionError
+        for error in (RuntimeError("/private/secret/chat"), SessionError("phase_changed")):
+            operation, _, wait, _, _, _, _ = self.make_operation()
+            def guard(): raise error
+            payload = self.assert_failure(operation, wait, guard=guard, expected=error)
+            self.assertEqual(payload["code"], "phase_changed" if isinstance(error, SessionError) else "interrupted")
+
+    def test_resolve_failures_preserve_exceptions_and_safe_response_stages(self):
+        for kind in ("geometry", "stale", "input", "verification"):
+            with self.subTest(kind=kind):
+                operation, clock, wait, events, _, _, _ = self.make_operation()
+                original_factory = operation.capture_factory
+                def capture_factory(*args, **kwargs):
+                    capture = original_factory(*args, **kwargs)
+                    poll = capture.poll
+                    def known_popup():
+                        result = poll()
+                        positive, _ = synthetic(captured_at=result.frame.captured_at)
+                        result.frame = replace(result.frame, pixels=positive.pixels)
+                        return result
+                    capture.poll = known_popup
+                    return capture
+                operation.capture_factory = capture_factory
+                error = RuntimeError("/private/secret/chat")
+                clicks, caught = [], []
+                def geometry(_layout):
+                    if kind == "geometry": raise error
+                    if kind == "stale": clock.value += .51
+                operation.geometry_check = geometry
+                class Capability:
+                    def guard(self): pass
+                    def wait(self, seconds):
+                        if kind == "verification" and clicks: raise error
+                        wait(seconds)
+                    def click(self, point, authorize):
+                        try:
+                            authorize()
+                            if kind == "input": raise error
+                        except BaseException as failure:
+                            caught.append(failure)
+                            raise
+                        clicks.append(point)
+                with self.assertRaises(RuntimeError) as raised:
+                    operation.resolve(Capability(), allow_reconnect=True)
+                if kind == "stale": self.assertIs(raised.exception, caught[0])
+                else: self.assertIs(raised.exception, error)
+                diagnostic = operation.failure.as_ipc()
+                expected = {"geometry": ("response_geometry", "failed"),
+                            "stale": ("response_geometry", "stale"),
+                            "input": ("response", "failed"),
+                            "verification": ("verification", "interrupted")}[kind]
+                self.assertEqual((diagnostic["stage"], diagnostic["code"]), expected)
+                self.assertNotIn("/private", repr(diagnostic))
+                self.assertEqual(len(clicks), 1 if kind == "verification" else 0)
+                self.assertEqual(events.count("capture_create"), 2)
+                self.assertIsNone(operation._capture)
+                self.assertIsNone(operation._recognition)
+
+    def test_successful_read_only_result_has_no_failure_metadata(self):
+        operation, _, wait, _, _, _, _ = self.make_operation()
+        operation.check(lambda: None, wait)
+        self.assertIsNone(operation.failure)
+
 
 if __name__ == "__main__":
     unittest.main()

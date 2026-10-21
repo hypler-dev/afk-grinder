@@ -497,6 +497,23 @@ def open_desktop(*, smoke: bool = False) -> None:
             _smoke_pack_worker(missing_sdk=missing_sdk)
             stage = "private_popup_models"
             _smoke_popup_models()
+            stage = "popup_diagnostic"
+            from .capture import CaptureDiagnostic
+            from .recognition.popup_diagnostic import PopupDiagnostic
+            with controller._lock:
+                controller._popup_phase, controller._popup_state = "result", "error"
+                controller._popup_message = "Popup check stopped. Check capture, content area and local recognition setup."
+                controller._popup_diagnostic = PopupDiagnostic(
+                    "capture_freshness", "stale",
+                    CaptureDiagnostic("stale", "worker_exit_freshness", "capture_error"))
+            diagnostic_deadline = time.monotonic() + 2
+            while time.monotonic() < diagnostic_deadline:
+                if window.evaluate_js("document.getElementById('popup-diagnostic').textContent === "
+                                      "'Diagnostic: capture_freshness / stale. Capture: stale at worker_exit_freshness (capture_error).'"):
+                    break
+                time.sleep(.05)
+            else:
+                raise RuntimeError("Synthetic popup diagnostic did not cross the desktop bridge.")
             stage = "ui_state"
             if not window.evaluate_js("getComputedStyle(document.getElementById('cleanup-banner')).display === 'none'"):
                 raise RuntimeError("Inactive cleanup warning is visible.")
@@ -533,6 +550,15 @@ def open_desktop(*, smoke: bool = False) -> None:
                         })()""")
                         if fits is not True:
                             raise RuntimeError("Native launcher section overflowed at interface scale.")
+                        if route == "session" and window.evaluate_js("""(() => {
+                            const row = document.getElementById('popup-diagnostic');
+                            const rect = row.getBoundingClientRect();
+                            return !row.hidden && rect.width > 0 && rect.left >= 0 &&
+                                rect.right <= innerWidth + 1 && row.scrollWidth <= row.clientWidth + 1 &&
+                                !row.hasAttribute('aria-live') && !row.hasAttribute('role') &&
+                                !row.hasAttribute('tabindex');
+                        })()""") is not True:
+                            raise RuntimeError("Native popup diagnostic overflowed or became an active status surface.")
                         if route == "setup" and window.evaluate_js("""(() => {
                             const panel = document.getElementById('pack-panel').getBoundingClientRect();
                             return panel.width > 0 && panel.left >= 0 && panel.right <= innerWidth + 1 &&

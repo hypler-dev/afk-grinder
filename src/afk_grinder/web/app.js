@@ -12,6 +12,9 @@
   const CAPTURE_CODES = new Set(['permission', 'window_count', 'window_missing', 'geometry', 'black_frame', 'timeout', 'conversion', 'unavailable', 'stale', 'unexpected']);
   const CAPTURE_STAGES = new Set(['initialization', 'preflight', 'discovery', 'window_selection', 'filter_geometry', 'display_selection', 'screenshot', 'pixel_conversion', 'frame_validation', 'worker', 'ipc_read', 'worker_exit', 'worker_deadline', 'capture_freshness', 'worker_exit_freshness', 'preview_freshness', 'preview_geometry', 'preview_encoding']);
   const CAPTURE_ERROR_TYPES = new Set(['capture_error', 'attribute_error', 'type_error', 'value_error', 'runtime_error', 'timeout_error', 'unexpected']);
+  const POPUP_DIAGNOSTIC_STAGES = new Set(["initialization", "model_validation", "worker_start", "warmup", "capture_start", "capture", "content_calibration", "capture_freshness", "recognition_submit", "recognition", "recognition_freshness", "classification", "reporting", "recording", "response_geometry", "response", "verification", "idle", "cleanup"]);
+  const POPUP_DIAGNOSTIC_CODES = new Set(["failed", "unavailable", "worker_failed", "worker_timeout", "stale", "layout_changed", "timeout", "closed", "clock_invalid", "interrupted", "phase_changed"]);
+  const POPUP_CAPTURE_DIAGNOSTIC_STAGES = new Set(['capture_start', 'capture', 'capture_freshness']);
   const MIB = 1024 * 1024;
   const model = { state: null, route: 'library', bridgeReady: false, polling: false, previewRequestId: 0, previewGameId: null, image: null, imageId: null, draftArea: null, pendingArea: null, pointer: null, areaAttested: false, gamesKey: '', candidatesKey: '', roiDrawId: 0, roiObserver: null, packDrawId: 0, packCanvasKey: '', packAnnouncement: '', packMessageKey: '', packError: '', replayFrameId: null, replayImage: null, replayImageId: null, replayRequestGeneration: 0, replayPlaying: false, replayTimer: null, replayRows: new Map(), pendingDeleteId: null, replayAutoFrameKey: null, recordingDraft: null, recordingDirty: false, recordingPending: null };
 
@@ -173,12 +176,25 @@
     $('#area-attestation').checked = model.areaAttested; $('#area-attestation').disabled = !editable;
   }
 
+  function popupDiagnostic(popup) {
+    const error = popup && popup.diagnostic;
+    if (!popup || popup.phase !== 'result' || popup.state !== 'error' || !error || typeof error !== 'object' || Array.isArray(error) || Object.keys(error).sort().join(',') !== 'capture,code,stage' || !POPUP_DIAGNOSTIC_STAGES.has(error.stage) || !POPUP_DIAGNOSTIC_CODES.has(error.code)) return '';
+    let detail = `Diagnostic: ${error.stage} / ${error.code}.`;
+    if (error.capture !== null) {
+      const capture = error.capture;
+      if (!POPUP_CAPTURE_DIAGNOSTIC_STAGES.has(error.stage) || !capture || typeof capture !== 'object' || Array.isArray(capture) || Object.keys(capture).sort().join(',') !== 'code,error_type,stage' || !CAPTURE_CODES.has(capture.code) || !CAPTURE_STAGES.has(capture.stage) || !CAPTURE_ERROR_TYPES.has(capture.error_type)) return '';
+      detail += ` Capture: ${capture.code} at ${capture.stage} (${capture.error_type}).`;
+    }
+    return detail;
+  }
+
   function renderPopup(popup, session) {
     const activePhase = ['checking', 'verifying'].includes(popup.state) ? popup.state : popup.phase;
     const resolved = popup.phase === 'result';
     const popupKind = { error: 'bad', protected: 'bad', blocked: 'bad', unknown: 'warn', bank_reward: 'good', disconnected: 'warn', popup_dismissed: 'good', reconnect_requested: 'good' };
     badge($('#popup-phase'), resolved ? phaseLabel(popup.state || 'result') : phaseLabel(activePhase), resolved ? (popupKind[popup.state] || '') : '');
     text('#popup-message', popup.message || 'Checks only approved Adopt Me popups. Unknown, login, purchase, and trade screens remain blocked.');
+    const diagnostic = $('#popup-diagnostic'); const detail = popupDiagnostic(popup); if (diagnostic.textContent !== detail) diagnostic.textContent = detail; diagnostic.hidden = !detail;
     $('#popup-check').disabled = !model.bridgeReady || Boolean(popup.busy) || !popup.can_check;
     $('#popup-resolve').disabled = !model.bridgeReady || Boolean(popup.busy) || !popup.can_resolve;
     $('#popup-resolve').textContent = popup.busy ? 'Resolving…' : 'Resolve approved popup';

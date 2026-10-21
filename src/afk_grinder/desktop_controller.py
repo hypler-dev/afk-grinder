@@ -192,6 +192,7 @@ class DesktopController:
         self._popup_phase = "idle"
         self._popup_state = "unknown"
         self._popup_message = "Calibrate content before checking popups."
+        self._popup_diagnostic = None
         self._allow_reconnect = False
         self._pack_picker = pack_picker
         self._pack_loader = pack_loader
@@ -267,6 +268,7 @@ class DesktopController:
                 "popup": {
                     "phase": self._popup_phase, "state": self._popup_state,
                     "message": self._popup_message,
+                    "diagnostic": self._popup_diagnostic_payload(),
                     "busy": self._popup_busy() or (bool(getattr(self._runner, "running", False))
                                                   and self._popup_phase == "checking"),
                     "can_check": self._can_popup(False), "can_resolve": self._can_popup(True),
@@ -571,6 +573,7 @@ class DesktopController:
             self._popup_phase = "idle"
             self._popup_state = "unknown"
             self._popup_message = "Popup operation stopped; fresh checks required."
+            self._popup_diagnostic = None
             self._acknowledged = False
             if self._start_cancel is not None:
                 self._start_cancel.set()
@@ -699,6 +702,7 @@ class DesktopController:
             self._popup_cancel.set()
             self._popup_phase, self._popup_state = "idle", "unknown"
             self._popup_message = "Fresh popup checks required."
+            self._popup_diagnostic = None
             self._pack_phase = "checking"
             self._pack_message = "Inspecting fresh frames. Stop cancels inspection. No input is sent."
 
@@ -859,6 +863,17 @@ class DesktopController:
                                and self._popup_state in {"bank_reward", "disconnected"}
                                and (self._popup_state != "disconnected" or self._allow_reconnect))
 
+    def _popup_diagnostic_payload(self):
+        from afk_grinder.recognition.popup_diagnostic import PopupDiagnostic
+        if self._popup_phase != "result" or self._popup_state != "error":
+            return None
+        if type(self._popup_diagnostic) is not PopupDiagnostic:
+            return None
+        try:
+            return self._popup_diagnostic.as_ipc()
+        except (AttributeError, TypeError, ValueError):
+            return None
+
     def _start_popup(self, resolve: bool) -> None:
         from afk_grinder.popup_session import PopupSession
         start_request = None
@@ -871,15 +886,17 @@ class DesktopController:
             self._acknowledged = False
             self._popup_phase = "checking"
             self._popup_message = "Starting local popup check."
+            self._popup_diagnostic = None
             allow_reconnect = self._allow_reconnect
 
-            def report(state, message):
+            def report(state, message, diagnostic=None):
                 with self._lock:
                     if (cancel.is_set() or self._closing
                             or calibration is not self._content_calibration):
                         return
                     self._popup_state = state
                     self._popup_message = message
+                    self._popup_diagnostic = diagnostic if state == "error" else None
                     self._popup_phase = "checking" if state in {"checking", "verifying"} else "result"
 
             session_id = uuid.uuid4().hex
@@ -888,7 +905,13 @@ class DesktopController:
                 if service is not None and not cancel.is_set():
                     service.submit(frame, session_id, state)
 
-            operation = PopupSession(calibration, report=report, record=record)
+            operation = PopupSession(calibration, report=report, record=record, clock=self._clock)
+            def report_failure(message):
+                try:
+                    diagnostic = operation.failure
+                except Exception:
+                    diagnostic = None
+                report("error", message, diagnostic)
             def end_recording():
                 if self._replay_service is not None:
                     self._replay_service.stop_session(session_id)
@@ -899,7 +922,7 @@ class DesktopController:
                     try:
                         operation.resolve(capability, allow_reconnect=allow_reconnect)
                     except Exception:
-                        report("error", "Popup response stopped. No further action will run.")
+                        report_failure("Popup response stopped. No further action will run.")
                         raise
                     finally:
                         end_recording()
@@ -916,7 +939,7 @@ class DesktopController:
                     try:
                         operation.check(guard, wait)
                     except Exception:
-                        report("error", "Popup check stopped. Check capture, content area and local recognition setup.")
+                        report_failure("Popup check stopped. Check capture, content area and local recognition setup.")
                     finally:
                         operation.close()
                         end_recording()
@@ -929,12 +952,17 @@ class DesktopController:
                 # controller lock and revoke this admission ticket.
                 self._runner.start_routine(routine, target=target, armed=True, cancel_event=cancel)
             except Exception:
-                cancel.set()
-                self._runner.stop()
                 with self._lock:
-                    self._popup_phase = "result"
-                    self._popup_state = "error"
-                    self._popup_message = "Popup response could not start. No further action will run."
+                    # Stop may have revoked this ticket during native readiness.
+                    # Publish only while this admission still owns the result.
+                    if not (cancel.is_set() or self._closing or calibration is not self._content_calibration):
+                        from afk_grinder.recognition.popup_diagnostic import PopupDiagnostic
+                        self._popup_phase = "result"
+                        self._popup_state = "error"
+                        self._popup_message = "Popup response could not start. No further action will run."
+                        self._popup_diagnostic = PopupDiagnostic("initialization", "failed")
+                    cancel.set()
+                self._runner.stop()
                 raise RuntimeError("Popup response could not start.") from None
             finally:
                 with self._lock:
@@ -997,6 +1025,7 @@ class DesktopController:
         self._popup_state = "unknown"
         self._popup_phase = "idle"
         self._popup_message = "Calibrate content before checking popups."
+        self._popup_diagnostic = None
         self._area = None
         self._area_layout = None
         self._content_calibration = None
@@ -1005,11 +1034,7 @@ class DesktopController:
     def _reset_area(self) -> None:
         with self._lock:
             self._require_reference_mutation_locked()
-            self._area = None
-            self._area_layout = None
-            self._content_calibration = None
-            self._invalidate_pack_locked()
-            self._tracker.invalidate()
+            self._clear_geometry_locked()
 
     def _set_area(self, payload: dict[str, Any]) -> None:
         self._require_payload(payload, {"preview_id", "rect"})
@@ -1030,11 +1055,9 @@ class DesktopController:
                 raise ValueError("Area dimensions must be positive.")
             if x + width > image_width or y + height > image_height:
                 raise ValueError("Area is outside the preview.")
+            self._clear_geometry_locked()
             self._area = Rect(x, y, width, height)
             self._area_layout = self._preview_layout
-            self._content_calibration = None
-            self._invalidate_pack_locked()
-            self._tracker.invalidate()
 
     def _check_area(self, payload: dict[str, Any]) -> None:
         self._require_payload(payload, {"preview_id", "attested"})
@@ -1051,7 +1074,8 @@ class DesktopController:
             if target is None:
                 raise RuntimeError("Select a verified Roblox target first.")
             area, layout = self._area, self._area_layout
-            self._invalidate_pack_locked()
+            self._clear_geometry_locked()
+            self._area, self._area_layout = area, layout
             self._preview_id += 1
             self._preview_frame = None
             self._preview_layout = None

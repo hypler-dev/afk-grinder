@@ -43,6 +43,10 @@ Read-only pack inspection, approved popup operations and replay observation use 
 
 Popup operations are disposable and cannot restart after close. OCR request admission and worker creation are serialized with cancellation; stopped requests and late results are dropped, and pipe cleanup waits for the parent writer to unwind. Replay rejects observations returned after cancellation or a phase/session deadline before submitting them to storage. Worker cleanup failure still ends the replay storage session and reports an error. These source safeguards do not establish native popup, care or recording acceptance.
 
+Terminal popup errors retain the existing generic primary message and may carry a `popup.diagnostic` object containing only fixed `stage`, `code` and optional `capture` metadata. The latter reuses the existing allowlisted capture code/stage/error-type contract and is restricted to capture phases. Backend construction and every export revalidate these values; frontend vocabulary/shape checks suppress unknown or malformed data. No exception strings, OCR text, pixels, paths or timing values are included. A diagnostic identifies the failed boundary, not a unique underlying cause. Original caller exceptions are rethrown unchanged after metadata is captured. Stop, new checks and target/calibration changes clear the displayed failure; canceled or superseded operations cannot publish it again. Diagnostics are neither persisted nor action authority.
+
+The Session popup panel shows this supplementary text only for a terminal error. Its existing DOM node is updated as text only, without a live region, focus change, new command or recovery button. Generic errors remain usable with older/missing diagnostic data. Synthetic WebView checks exercise the actual bridge and row at 640/960/1180-pixel windows, including 200% zoom at the smallest size, while preserving document fit and visible Stop. These checks use no input backend or game capture and do not establish formal assistive-technology acceptance.
+
 ## States and failure handling
 
 - Unsupported platform or missing native dependencies: live controls unavailable; dry run works.
