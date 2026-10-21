@@ -15,6 +15,7 @@ from afk_grinder.recognition.pack_results import AnchorHit, PackResultError, val
 from afk_grinder.recognition.pack_service import PackRecognitionService
 from afk_grinder.recognition.packs import ResourcePack
 from afk_grinder.recognition.state import StateInspection, StateInspector, classify_scores
+from .session import BoundedSession, SessionError
 
 
 _ERROR_CODES = frozenset({
@@ -75,6 +76,7 @@ class PackInspectionSession:
         self._closed = False
         self._started = False
         self._sequence = 0
+        self._session: BoundedSession | None = None
 
     def close(self) -> None:
         """Cancel outstanding observation work. Safe to call repeatedly."""
@@ -82,6 +84,8 @@ class PackInspectionSession:
         self._capture = None
         self._recognition = None
         self._closed = True
+        if self._session is not None:
+            self._session.close()
         if capture is not None:
             try:
                 capture.cancel()
@@ -99,18 +103,33 @@ class PackInspectionSession:
         if self._closed or self._started:
             raise PackInspectionError("timeout")
         self._started = True
-        deadline = self.clock() + _SESSION_SECONDS
         inspector = StateInspector(self.pack)
         latest_captured_at: float | None = None
+        callback_errors: list[BaseException] = []
+
+        def guarded() -> None:
+            try:
+                guard()
+            except BaseException as error:
+                callback_errors.append(error)
+                raise
+
+        def waited(seconds: float) -> None:
+            try:
+                wait(seconds)
+            except BaseException as error:
+                callback_errors.append(error)
+                raise
+
         try:
-            self._guard(guard, deadline)
+            self._session = BoundedSession(guarded, waited, clock=self.clock, session_seconds=_SESSION_SECONDS)
+            self._session.guard()
             self._progress(progress, "warming")
-            self._guard(guard, deadline)
-            self._warm(guard, wait, deadline)
+            self._warm()
             observed = 0
             while observed < _MAX_FRAMES:
-                raw = self._capture_frame(guard, wait, deadline)
-                now = self._now(deadline)
+                raw = self._capture_frame()
+                now = self._now()
                 self._require_fresh(raw.captured_at, now)
                 if latest_captured_at is not None and raw.captured_at <= latest_captured_at:
                     raise PackInspectionError("stale")
@@ -129,15 +148,15 @@ class PackInspectionSession:
                     observation = self.calibration.crop(raw_observation)
                 except (TypeError, ValueError):
                     raise PackInspectionError("layout_changed") from None
-                self._guard(guard, deadline)
-                now = self._now(deadline)
+                self._session.guard()
+                now = self._now()
                 self._require_fresh(observation.captured_at, now)
                 age = now - observation.captured_at
                 timeout = min(_MATCH_SECONDS, _FRESHNESS_SECONDS - age)
                 if timeout <= 0:
                     raise PackInspectionError("stale")
-                matches = self._match(observation, timeout, guard, wait, deadline)
-                now = self._now(deadline)
+                matches = self._match(observation, timeout)
+                now = self._now()
                 self._require_fresh(observation.captured_at, now)
                 try:
                     anchors = validate_anchor_hits(self.pack, observation.layout.physical_size, matches)
@@ -151,51 +170,68 @@ class PackInspectionSession:
                     raise PackInspectionError("invalid_result") from None
                 observed += 1
                 required = self._required_frames(static.state_id)
-                report = PackInspectionReport(state, anchors, raw, required, observed)
                 if state.reason != "unstable" or observed == _MAX_FRAMES:
+                    self._session.guard()
+                    report = PackInspectionReport(state, anchors, raw, required, observed)
+                    self._session.guard()
                     return report
                 self._progress(progress, f"checking {observed}/{_MAX_FRAMES}")
-                self._pause(guard, wait, deadline, .05)
+                self._session.wait(.05)
             raise PackInspectionError("timeout")
+        except SessionError as error:
+            if any(error is callback_error for callback_error in callback_errors):
+                raise
+            raise PackInspectionError("timeout") from None
         finally:
             self.close()
 
-    def _warm(self, guard: Callable[[], None], wait: Callable[[float], None], deadline: float) -> None:
+    def _warm(self) -> None:
+        if self._session is None:
+            raise PackInspectionError("timeout")
+        phase = self._session.phase("warm", _WARMUP_SECONDS)
         try:
             self._recognition = self.recognition_factory(self.pack, self.calibration.viewport[2:])
+        except Exception:
+            raise PackInspectionError("recognition_failed") from None
+        phase.guard()
+        try:
             self._recognition.start()
         except Exception:
             raise PackInspectionError("recognition_failed") from None
-        warm_deadline = min(deadline, self.clock() + _WARMUP_SECONDS)
+        phase.guard()
         while not self._recognition.ready:
-            self._guard(guard, warm_deadline)
+            phase.guard()
             try:
                 result = self._recognition.poll()
             except Exception:
                 raise PackInspectionError("recognition_failed") from None
-            self._guard(guard, warm_deadline)
+            phase.guard()
             if result is not None:
                 raise PackInspectionError("recognition_failed")
-            self._pause(guard, wait, warm_deadline, .02)
+            phase.wait(.02)
 
-    def _capture_frame(self, guard: Callable[[], None], wait: Callable[[float], None], deadline: float) -> CapturedWindow:
-        self._guard(guard, deadline)
+    def _capture_frame(self) -> CapturedWindow:
+        if self._session is None:
+            raise PackInspectionError("timeout")
+        phase = self._session.phase("capture", _CAPTURE_SECONDS)
+        phase.guard()
         try:
             self._capture = self.capture_factory("capture", self.calibration.source_layout.target,
                                                  timeout=_CAPTURE_SECONDS)
         except Exception:
             raise PackInspectionError("capture_failed") from None
+        phase.guard()
         try:
             while True:
-                self._guard(guard, deadline)
+                phase.guard()
                 try:
                     result = self._capture.poll()
                 except Exception:
                     raise PackInspectionError("capture_failed") from None
-                self._guard(guard, deadline)
+                phase.guard()
                 if result is not None:
                     break
-                self._pause(guard, wait, deadline, .02)
+                phase.wait(.02)
             try:
                 failed = getattr(result, "error", "")
                 frame = getattr(result, "frame", None)
@@ -212,22 +248,28 @@ class PackInspectionSession:
                 except Exception:
                     pass
 
-    def _match(self, observation: Observation, timeout: float, guard: Callable[[], None],
-               wait: Callable[[float], None], deadline: float) -> tuple[AnchorHit, ...]:
+    def _match(self, observation: Observation, timeout: float) -> tuple[AnchorHit, ...]:
+        if self._session is None:
+            raise PackInspectionError("timeout")
+        phase = self._session.phase("match", _MATCH_SECONDS)
+        phase.guard()
         try:
             self._recognition.submit(*observation.layout.physical_size, observation.pixels, timeout=timeout)
         except Exception:
             raise PackInspectionError("recognition_failed") from None
+        phase.guard()
         while True:
-            self._guard(guard, deadline)
+            self._require_fresh(observation.captured_at, self._now())
+            phase.guard()
             try:
                 result = self._recognition.poll()
             except Exception:
                 raise PackInspectionError("recognition_failed") from None
-            self._guard(guard, deadline)
+            phase.guard()
+            self._require_fresh(observation.captured_at, self._now())
             if result is not None:
                 break
-            self._pause(guard, wait, deadline, .02)
+            phase.wait(.02)
         if getattr(result, "error", ""):
             raise PackInspectionError("recognition_failed")
         hits = getattr(result, "hits", None)
@@ -243,25 +285,14 @@ class PackInspectionSession:
                 return state.stable_frames
         return 0
 
-    def _guard(self, guard: Callable[[], None], deadline: float) -> None:
-        if self._closed or self._now(deadline) >= deadline:
+    def _now(self) -> float:
+        if self._session is None:
             raise PackInspectionError("timeout")
-        guard()
-        if self._closed or self._now(deadline) >= deadline:
-            raise PackInspectionError("timeout")
-
-    def _pause(self, guard: Callable[[], None], wait: Callable[[float], None], deadline: float,
-               seconds: float) -> None:
-        self._guard(guard, deadline)
-        wait(min(seconds, max(0.0, deadline - self.clock())))
-        self._guard(guard, deadline)
-
-    def _now(self, deadline: float) -> float:
+        self._session.guard()
         now = self.clock()
         if type(now) not in (int, float):
-            raise PackInspectionError("timeout")
-        if now > deadline:
-            raise PackInspectionError("timeout")
+            raise PackInspectionError("stale")
+        self._session.guard()
         return float(now)
 
     @staticmethod
@@ -270,5 +301,9 @@ class PackInspectionSession:
             raise PackInspectionError("stale")
 
     def _progress(self, progress: Callable[[str], None] | None, message: str) -> None:
-        if progress is not None and not self._closed:
+        if progress is not None:
+            if self._session is None:
+                raise PackInspectionError("timeout")
+            self._session.guard()
             progress(message)
+            self._session.guard()

@@ -15,6 +15,7 @@ from afk_grinder.recognition.content_calibration import ContentCalibration
 from afk_grinder.recognition.frame_geometry import layout_from_capture
 from afk_grinder.recognition.pack_results import AnchorHit
 from afk_grinder.recognition.packs import State, load_pack
+from afk_grinder.session import SessionError
 from tools.make_fixture_demo import generate
 
 
@@ -105,15 +106,17 @@ class PackInspectionTests(unittest.TestCase):
     def _stable_pack(self):
         return replace(self.pack, states=(State("ready", ("gameplay",), (), 2, "gameplay"),))
 
-    def _session(self, frames, results, *, pack=None, ready=True):
+    def _session(self, frames, results, *, pack=None, ready=True, custom_capture_factory=None,
+                 recognition_factory=None):
         jobs = []
         recognition = Recognition(results, ready=ready)
-        def capture_factory(*_args, **_kwargs):
+        def default_capture_factory(*_args, **_kwargs):
             job = Job(frames.pop(0), clock=self.clock)
             jobs.append(job)
             return job
-        session = PackInspectionSession(pack or self.pack, self.calibration, capture_factory=capture_factory,
-                                        recognition_factory=lambda *_: recognition, clock=self.clock)
+        session = PackInspectionSession(pack or self.pack, self.calibration,
+                                        capture_factory=custom_capture_factory or default_capture_factory,
+                                        recognition_factory=recognition_factory or (lambda *_: recognition), clock=self.clock)
         return session, jobs, recognition
 
     def test_two_distinct_fresh_frames_return_stable_terminal_report(self):
@@ -207,6 +210,184 @@ class PackInspectionTests(unittest.TestCase):
             session.run(guard, self.clock.wait, progress=progress.append)
         self.assertEqual(progress, ["warming"])
         self.assertTrue(recognition.closed)
+
+    def test_capture_phase_times_out_before_outer_budget(self):
+        jobs = []
+        def capture_factory(*_args, **_kwargs):
+            job = Job(self.frame, clock=self.clock, after=self.clock.value + 8.01)
+            jobs.append(job)
+            return job
+        session, _, _ = self._session(
+            [self.frame], [_result(self._hits())], pack=self._stable_pack(), custom_capture_factory=capture_factory,
+        )
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertLess(self.clock.value, 130.0)
+        self.assertTrue(jobs[0].cancelled)
+
+    def test_late_warm_ready_and_match_result_are_rejected(self):
+        class LateWarm(Recognition):
+            def poll(inner):
+                if self.clock.value >= 115.0:
+                    inner.ready = True
+                return None
+        warm = LateWarm([], ready=False)
+        session, _, _ = self._session([self.frame], [], recognition_factory=lambda *_: warm)
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertTrue(warm.closed)
+
+        class LateResult(Recognition):
+            def poll(inner):
+                if not inner.submissions:
+                    return None
+                if self.clock.value <= 100.5:
+                    return None
+                return _result(self._hits())
+        late = LateResult([], ready=True)
+        session, _, _ = self._session([self.frame], [], pack=self._stable_pack(),
+                                      recognition_factory=lambda *_: late)
+        with self.assertRaisesRegex(PackInspectionError, "^stale$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertTrue(late.closed)
+
+    def test_close_inside_factory_or_poll_never_starts_or_returns_report(self):
+        created = Recognition([])
+        holder = {}
+        def factory(*_args):
+            holder["session"].close()
+            return created
+        session, _, _ = self._session([self.frame], [], recognition_factory=factory)
+        holder["session"] = session
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertFalse(created.started)
+        self.assertTrue(created.closed)
+
+        jobs = []
+        def capture_factory(*_args, **_kwargs):
+            holder["session"].close()
+            job = Job(self.frame)
+            jobs.append(job)
+            return job
+        session, _, _ = self._session([self.frame], [_result(self._hits())], pack=self._stable_pack(),
+                                      custom_capture_factory=capture_factory)
+        holder["session"] = session
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertTrue(jobs[0].cancelled)
+
+        class ClosingPoll(Recognition):
+            def poll(inner):
+                holder["session"].close()
+                return _result(self._hits())
+        polling = ClosingPoll([], ready=True)
+        session, _, _ = self._session([self.frame], [], pack=self._stable_pack(),
+                                      recognition_factory=lambda *_: polling)
+        holder["session"] = session
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
+        self.assertTrue(polling.closed)
+
+    def test_external_guard_error_is_not_rewritten(self):
+        stopped = RuntimeError("controller cancelled")
+        session, _, _ = self._session([self.frame], [_result(self._hits())])
+        with self.assertRaises(RuntimeError) as raised:
+            session.run(lambda: (_ for _ in ()).throw(stopped), self.clock.wait)
+        self.assertIs(raised.exception, stopped)
+
+    def test_external_session_errors_from_guard_poll_and_wait_are_not_rewritten(self):
+        admitted = SessionError("closed")
+        session, _, _ = self._session([self.frame], [_result(self._hits())])
+        with self.assertRaises(SessionError) as raised:
+            session.run(lambda: (_ for _ in ()).throw(admitted), self.clock.wait)
+        self.assertIs(raised.exception, admitted)
+
+        holder = {"poll": False}
+        polled = SessionError("phase_changed")
+        class PollingService(Recognition):
+            def poll(inner):
+                if inner.submissions:
+                    holder["poll"] = True
+                    return _result(self._hits())
+                return None
+        service = PollingService([], ready=True)
+        session, _, _ = self._session([self.frame], [], pack=self._stable_pack(),
+                                      recognition_factory=lambda *_: service)
+        with self.assertRaises(SessionError) as raised:
+            session.run(lambda: (_ for _ in ()).throw(polled) if holder["poll"] else None, self.clock.wait)
+        self.assertIs(raised.exception, polled)
+
+        waited = SessionError("interrupted")
+        waiting = Recognition([], ready=False)
+        session, _, _ = self._session([self.frame], [], recognition_factory=lambda *_: waiting)
+        with self.assertRaises(SessionError) as raised:
+            session.run(lambda: None, lambda _seconds: (_ for _ in ()).throw(waited))
+        self.assertIs(raised.exception, waited)
+
+    def test_guard_errors_after_resource_callbacks_are_not_rewritten(self):
+        def run_case(stage, *, capture_factory=None, recognition_factory=None):
+            state = {"stage": None}
+            stopped = RuntimeError(stage)
+            def guard():
+                if state["stage"] == stage:
+                    raise stopped
+            session, _, _ = self._session(
+                [self.frame], [_result(self._hits())], pack=self._stable_pack(),
+                custom_capture_factory=capture_factory(state) if capture_factory else None,
+                recognition_factory=recognition_factory(state) if recognition_factory else None,
+            )
+            with self.assertRaises(RuntimeError) as raised:
+                session.run(guard, self.clock.wait)
+            self.assertIs(raised.exception, stopped)
+
+        def after_recognition_factory(state):
+            def factory(*_args):
+                state["stage"] = "factory"
+                return Recognition([])
+            return factory
+        run_case("factory", recognition_factory=after_recognition_factory)
+
+        def after_start(state):
+            class Service(Recognition):
+                def start(inner):
+                    super().start()
+                    state["stage"] = "start"
+            return lambda *_: Service([])
+        run_case("start", recognition_factory=after_start)
+
+        def after_capture_factory(state):
+            def factory(*_args, **_kwargs):
+                state["stage"] = "capture"
+                return Job(self.frame)
+            return factory
+        run_case("capture", capture_factory=after_capture_factory)
+
+        def after_submit(state):
+            class Service(Recognition):
+                def submit(inner, *args, **kwargs):
+                    super().submit(*args, **kwargs)
+                    state["stage"] = "submit"
+            return lambda *_: Service([])
+        run_case("submit", recognition_factory=after_submit)
+
+        def after_poll(state):
+            class Service(Recognition):
+                def poll(inner):
+                    if inner.submissions:
+                        state["stage"] = "poll"
+                        return _result(self._hits())
+                    return None
+            return lambda *_: Service([])
+        run_case("poll", recognition_factory=after_poll)
+
+    def test_finished_session_cannot_be_reused(self):
+        second = self._frame(100.05)
+        session, _, _ = self._session([self.frame, second], [_result(self._hits()), _result(self._hits())],
+                                      pack=self._stable_pack())
+        session.run(lambda: None, self.clock.wait)
+        with self.assertRaisesRegex(PackInspectionError, "^timeout$"):
+            session.run(lambda: None, self.clock.wait)
 
     def test_no_input_path_or_recording_imports(self):
         import afk_grinder.pack_inspection as module

@@ -144,6 +144,123 @@ class PopupCoordinatorTests(unittest.TestCase):
         for kwargs in ({"geometry_error": True}, {"stop_before_click": True}):
             self.assertEqual(self.run_operation(["disconnected", "disconnected"], **kwargs)[1], [])
 
+class PopupLifecycleTests(unittest.TestCase):
+    def make_operation(self, *, warm_hook=lambda: None, capture_hook=lambda: None,
+                       result_hook=lambda: None, report_hook=lambda *_: None,
+                       recognition_factory_hook=lambda: None, capture_factory_hook=lambda: None):
+        clock = SimpleNamespace(value=100.)
+        events, reports, records, submitted = [], [], [], []
+        current = {}
+        def capture_factory(*args, **kwargs):
+            events.append("capture_create")
+            capture_factory_hook()
+            _, hits = synthetic(captured_at=clock.value)
+            current["hits"] = hits
+            raw = CapturedWindow(TARGET, RAW.window_id, (-900, 40, 800, 600), (800, 600), "display",
+                                 (1., 1.), bytes((55, 55, 55)) * 800 * 600, "BGR8", clock.value,
+                                 "window-unverified", False)
+            def poll():
+                events.append("capture_poll")
+                capture_hook()
+                return SimpleNamespace(frame=raw, error="")
+            return SimpleNamespace(poll=poll, cancel=lambda: events.append("capture_cancel"))
+        class Recognition:
+            @property
+            def ready(self):
+                warm_hook()
+                return True
+            def start(self): events.append("start")
+            def submit(self, *args, **kwargs): submitted.append(kwargs["timeout"])
+            def poll(self):
+                result_hook()
+                return SimpleNamespace(hits=current["hits"], error="")
+            def close(self): events.append("close")
+        def recognition_factory(*args):
+            events.append("recognition_create")
+            recognition_factory_hook()
+            return Recognition()
+        def report(*args):
+            reports.append(args)
+            report_hook(*args)
+        operation = PopupSession(CAL, report=report, record=lambda *args: records.append(args),
+                                 clock=lambda: clock.value, capture_factory=capture_factory,
+                                 recognition_factory=recognition_factory, models=lambda: Path("unused"))
+        wait = lambda seconds: setattr(clock, "value", clock.value + seconds)
+        return operation, clock, wait, events, reports, records, submitted
+
+    def test_closed_operations_never_restart_workers(self):
+        operation, _, wait, events, reports, _, _ = self.make_operation()
+        operation.close()
+        for _ in range(2):
+            with self.assertRaisesRegex(RuntimeError, "closed"):
+                operation.check(lambda: None, wait)
+        self.assertEqual(events, [])
+        self.assertEqual(reports, [])
+
+    def test_late_warm_and_factory_close_cannot_reach_capture(self):
+        holder = {}
+        operation, clock, wait, events, _, _, _ = self.make_operation(
+            warm_hook=lambda: setattr(holder["clock"], "value", 116.))
+        holder["clock"] = clock
+        with self.assertRaisesRegex(RuntimeError, "timeout"):
+            operation.check(lambda: None, wait)
+        self.assertEqual(events, ["recognition_create", "start", "close"])
+        operation, _, wait, events, _, _, _ = self.make_operation(
+            recognition_factory_hook=lambda: holder["operation"].close())
+        holder["operation"] = operation
+        with self.assertRaisesRegex(RuntimeError, "closed"):
+            operation.check(lambda: None, wait)
+        self.assertEqual(events, ["recognition_create", "close"])
+
+    def test_capture_close_and_expired_capture_drop_pixels(self):
+        holder = {}
+        operation, clock, wait, events, _, records, submitted = self.make_operation(
+            capture_hook=lambda: setattr(holder["clock"], "value", 108.1))
+        holder["clock"] = clock
+        with self.assertRaisesRegex(RuntimeError, "timeout"):
+            operation.check(lambda: None, wait)
+        self.assertEqual(records, [])
+        self.assertEqual(submitted, [])
+        self.assertEqual(events.count("capture_cancel"), 1)
+        self.assertEqual(events.count("close"), 1)
+        operation, _, wait, events, _, _, submitted = self.make_operation(
+            capture_factory_hook=lambda: holder["operation"].close())
+        holder["operation"] = operation
+        with self.assertRaisesRegex(RuntimeError, "closed"):
+            operation.check(lambda: None, wait)
+        self.assertNotIn("capture_poll", events)
+        self.assertEqual(events.count("capture_cancel"), 1)
+        self.assertEqual(submitted, [])
+
+    def test_late_recognition_and_report_cancellation_never_record(self):
+        holder = {}
+        operation, clock, wait, _, reports, records, submitted = self.make_operation(
+            result_hook=lambda: setattr(holder["clock"], "value", 100.51))
+        holder["clock"] = clock
+        with self.assertRaisesRegex(RuntimeError, "expired"):
+            operation.check(lambda: None, wait)
+        self.assertEqual(records, [])
+        self.assertEqual([report[0] for report in reports], ["checking"])
+        self.assertTrue(all(0 < timeout <= .5 for timeout in submitted))
+        operation, _, wait, _, reports, records, _ = self.make_operation(
+            report_hook=lambda state, _: holder["operation"].close() if state != "checking" else None)
+        holder["operation"] = operation
+        with self.assertRaisesRegex(RuntimeError, "closed"):
+            operation.check(lambda: None, wait)
+        self.assertEqual(records, [])
+
+    def test_completed_match_budget_does_not_cover_recording_interval(self):
+        operation, _, wait, events, _, records, _ = self.make_operation()
+        try:
+            operation._warm(lambda: None, wait)
+            operation._observe(lambda: None, wait)
+            wait(2)
+            operation._observe(lambda: None, wait)
+            self.assertEqual(len(records), 2)
+        finally:
+            operation.close()
+        self.assertEqual(events.count("close"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

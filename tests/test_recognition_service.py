@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import queue
 import threading
 import time
 import unittest
@@ -27,6 +28,7 @@ class Pipe:
         self.packets = list(packets)
         self.sent = []
         self.closed = False
+        self.close_calls = 0
 
     def recv_bytes(self, maximum):
         if not self.packets:
@@ -40,6 +42,7 @@ class Pipe:
         self.sent.append(packet)
 
     def close(self):
+        self.close_calls += 1
         self.closed = True
 
 
@@ -140,6 +143,50 @@ class BlockingReadPipe(LoopPipe):
             self.release.wait(1)
             raise EOFError
         return super().recv_bytes(maximum)
+
+
+class BlockingAdmissionQueue(queue.Queue):
+    """Blocks one producer after state admission until the test releases it."""
+
+    def __init__(self):
+        super().__init__(maxsize=1)
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def put_nowait(self, item):
+        self.entered.set()
+        if not self.release.wait(1):
+            raise RuntimeError("Test admission was not released.")
+        return super().put_nowait(item)
+
+
+class CloseWinsLock:
+    """Makes the close caller acquire the lifecycle lock before launch."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.launch_waiting = threading.Event()
+        self.release_launch = threading.Event()
+        self._launch_thread: int | None = None
+
+    def acquire(self):
+        current = threading.get_ident()
+        if self._launch_thread is None:
+            self._launch_thread = current
+            self.launch_waiting.set()
+            if not self.release_launch.wait(1):
+                raise RuntimeError("Test launch was not released.")
+        return self._lock.acquire()
+
+    def release(self):
+        self._lock.release()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.release()
 
 
 class FakeProcess:
@@ -374,6 +421,75 @@ class RecognitionServiceTests(unittest.TestCase):
                 finally:
                     parent.release.set()
                     service.close()
+
+    def test_close_before_launch_does_not_create_a_child(self):
+        parent = LoopPipe()
+        context = Context(parent)
+        service = RecognitionService(Path("/model"), LABELS, _context=context)
+        lifecycle_lock = CloseWinsLock()
+        service._close_lock = lifecycle_lock
+
+        service.start()
+        self.assertTrue(lifecycle_lock.launch_waiting.wait(1))
+        close = threading.Thread(target=service.close)
+        close.start()
+        self.assertTrue(wait_for(lambda: not close.is_alive() or service._stopped.is_set()))
+        try:
+            self.assertTrue(service._stopped.is_set())
+        finally:
+            lifecycle_lock.release_launch.set()
+        close.join(1)
+
+        self.assertTrue(wait_for(lambda: not service._thread.is_alive()))
+        self.assertFalse(context.process.started)
+        self.assertTrue(parent.closed)
+        self.assertTrue(context.child.closed)
+
+    def test_close_racing_enqueue_drains_admitted_request_and_drops_result(self):
+        parent = LoopPipe(respond=False)
+        context = Context(parent)
+        service = RecognitionService(Path("/model"), LABELS, _context=context)
+        admission = BlockingAdmissionQueue()
+        service._requests = admission
+        service.start()
+        self.assertTrue(wait_for(lambda: service.ready))
+
+        submit = threading.Thread(target=service.submit, args=(8, 8, bytes(8 * 8 * 3)))
+        submit.start()
+        self.assertTrue(admission.entered.wait(1))
+        cancel = threading.Thread(target=service.cancel)
+        cancel.start()
+        admission.release.set()
+        submit.join(1)
+        cancel.join(1)
+
+        self.assertFalse(submit.is_alive())
+        self.assertFalse(cancel.is_alive())
+        self.assertTrue(service._requests.empty())
+        parent.packets.append(b'{"kind":"result","request_id":1,"hits":[]}')
+        self.assertIsNone(service.poll())
+        self.assertTrue(context.process.terminated)
+
+    def test_close_defers_pipe_close_and_drops_pixels_during_blocked_send(self):
+        parent = BlockingSendPipe()
+        context = Context(parent)
+        service = RecognitionService(Path("/model"), LABELS, _context=context)
+        try:
+            service.start()
+            self.assertTrue(wait_for(lambda: service.ready))
+            service.submit(8, 8, bytes(8 * 8 * 3), timeout=1)
+            self.assertTrue(parent.blocked.wait(1))
+            service.close()
+            self.assertFalse(parent.closed)
+
+            parent.release.set()
+            self.assertTrue(wait_for(lambda: parent.closed))
+            self.assertEqual(len(parent.sent), 1)
+            self.assertTrue(context.process.terminated)
+        finally:
+            parent.release.set()
+            service.close()
+        self.assertEqual(parent.close_calls, 1)
 
 
 class RecognitionServiceNativeCanaryTests(unittest.TestCase):

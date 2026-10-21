@@ -39,6 +39,10 @@ An Escape key state check runs during live countdown and playback, including wai
 
 The engine runs on a worker thread, posts status through a thread-safe queue, and uses a cancellation event. The launcher passes a separate start ticket that Stop/Close invalidates before a pending readiness check can complete; cancellation cannot be erased by a late start. Native calls must be short and synchronous. It checks guards at most every 20 milliseconds during waits, subject to OS scheduling; this is not a real-time guarantee.
 
+Read-only pack inspection, approved popup operations and replay observation use a shared cooperative session budget, capped at thirty seconds per operation. Warmup is limited to fifteen seconds, each capture to eight seconds and each recognition phase to two seconds; evidence must also remain within its stricter 0.5-second freshness window. Replay's three-second focus countdown and frame intervals consume its same outer budget. Completing a match moves to an idle phase before a replay interval; idle never extends the outer deadline. Guards run before and after waits and worker callbacks. Expired phases cannot be replaced to evade their deadline, new phases revoke old phase callbacks, and close or interruption is irreversible. Invalid or backward clocks fail closed. These phases carry no input or pack-approval authority and do not preempt a blocked native call.
+
+Popup operations are disposable and cannot restart after close. OCR request admission and worker creation are serialized with cancellation; stopped requests and late results are dropped, and pipe cleanup waits for the parent writer to unwind. Replay rejects observations returned after cancellation or a phase/session deadline before submitting them to storage. Worker cleanup failure still ends the replay storage session and reports an error. These source safeguards do not establish native popup, care or recording acceptance.
+
 ## States and failure handling
 
 - Unsupported platform or missing native dependencies: live controls unavailable; dry run works.

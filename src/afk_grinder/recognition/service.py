@@ -206,6 +206,7 @@ class RecognitionService:
         self._results: queue.Queue[RecognitionResult] = queue.Queue(maxsize=1)
         self._lock = threading.Lock()
         self._close_lock = threading.Lock()
+        self._connection_close_lock = threading.Lock()
         self._stopped = threading.Event()
         self._thread: threading.Thread | None = None
         self._state = "new"
@@ -213,6 +214,8 @@ class RecognitionService:
         self._pending = False
         self._active_request_id: int | None = None
         self._deadline_timer: threading.Timer | None = None
+        self._launch_active = False
+        self._connections_closed = False
 
     @property
     def ready(self) -> bool:
@@ -244,8 +247,17 @@ class RecognitionService:
             timer = threading.Timer(float(timeout), self._expire, args=(observation.request_id,))
             timer.daemon = True
             self._deadline_timer = timer
-        self._requests.put_nowait(observation)
-        timer.start()
+            # Stop drains this queue while holding the same state lock. Keep
+            # admission and publication together so a frame cannot be added
+            # after cancellation has drained the queue.
+            try:
+                self._requests.put_nowait(observation)
+            except queue.Full:
+                self._pending = False
+                self._active_request_id = None
+                self._deadline_timer = None
+                raise RuntimeError("Recognition worker is not ready for another frame.") from None
+            timer.start()
 
     def poll(self) -> RecognitionResult | None:
         try:
@@ -261,14 +273,16 @@ class RecognitionService:
 
     def _launch(self) -> None:
         try:
-            self._process.start()
-            self._child.close()
-            with self._lock:
-                permitted = not self._stopped.is_set()
-                if permitted:
-                    self._start_gate.set()
-            if not permitted:
-                return
+            # Child creation and cancellation share one lifecycle lock. A
+            # cancellation that wins before this section cannot leave a child
+            # alive after its cleanup has already inspected the process.
+            with self._close_lock:
+                if self._stopped.is_set():
+                    return
+                self._launch_active = True
+                self._process.start()
+                self._child.close()
+                self._start_gate.set()
             if not self._await_ready():
                 return
             self._serve()
@@ -276,6 +290,10 @@ class RecognitionService:
             self._publish(RecognitionResult(error=WARMUP_ERROR))
         finally:
             self._stop(drop_results=False)
+            # The launch thread is the only parent writer. Stop terminates
+            # the child but leaves this endpoint open until a blocked write
+            # has unwound, avoiding a concurrent close/send race.
+            self._close_connections()
 
     def _await_ready(self) -> bool:
         deadline = time.monotonic() + self._warmup_timeout
@@ -305,9 +323,21 @@ class RecognitionService:
             except queue.Empty:
                 continue
             try:
+                # Claim the live request immediately before write. Stop may
+                # then kill a non-reading child, which unblocks this writer
+                # without waiting on a lifecycle lock.
+                with self._lock:
+                    permitted = (not self._stopped.is_set() and self._pending
+                                 and self._active_request_id == observation.request_id)
+                if not permitted:
+                    continue
                 _send(self._parent, {"kind": "match", "request_id": observation.request_id,
                                      "width": observation.width, "height": observation.height,
                                      "timeout": observation.timeout})
+                # Header send can block. Do not send pixels once cancellation
+                # has won while it was blocked.
+                if self._stopped.is_set():
+                    continue
                 self._parent.send_bytes(observation.pixels)
                 result = self._await_result(observation)
             except Exception:
@@ -393,5 +423,14 @@ class RecognitionService:
                         self._process.kill()
                         self._process.join(timeout=0.2)
                 finally:
-                    self._parent.close()
-                    self._child.close()
+                    if not self._launch_active:
+                        self._close_connections()
+
+    def _close_connections(self) -> None:
+        """Close endpoints once no parent pipe write can still be active."""
+        with self._connection_close_lock:
+            if self._connections_closed:
+                return
+            self._connections_closed = True
+            self._parent.close()
+            self._child.close()
