@@ -87,6 +87,54 @@ def _smoke_popup_models() -> None:
         service.close()
 
 
+def _smoke_pack_worker(*, missing_sdk: bool) -> None:
+    """Check the real spawned pack worker with original in-memory pixels."""
+    if missing_sdk:
+        return
+    from hashlib import sha256
+    from io import BytesIO
+    from PIL import Image
+    from .recognition.pack_service import PackRecognitionService
+    from .recognition.packs import Anchor, Asset, Provenance, ResourcePack, Setup, State
+    texture = Image.frombytes("RGB", (16, 16), bytes((index * 37 + index // 17 * 13) % 256
+                                                   for index in range(16 * 16 * 3)))
+    encoded = BytesIO()
+    texture.save(encoded, format="PNG")
+    data = encoded.getvalue()
+    pack = ResourcePack(
+        "example.worker-smoke", "0.1.0", "0.2.0",
+        Provenance("https://github.com/hypler-dev/afk-grinder", "0" * 40, "MIT", "Original synthetic texture."),
+        (96, 64), Setup("en", "Synthetic worker check only.", (96, 64)),
+        (Asset("texture", "assets/texture.png", sha256(data).hexdigest(), data),),
+        (Anchor("texture", "texture", (0, 0, 96, 64), .97, (1., 1.)),),
+        (State("synthetic", ("texture",), (), 2, "gameplay"),),
+    )
+    image = Image.new("RGB", (96, 64), (3, 7, 11))
+    image.paste(texture, (11, 9))
+    service = PackRecognitionService(pack, (96, 64))
+    try:
+        service.start()
+        deadline = time.monotonic() + 15
+        while not service.ready:
+            if service.poll() is not None or time.monotonic() >= deadline:
+                raise RuntimeError("Synthetic pack worker did not warm.")
+            time.sleep(.02)
+        service.submit(96, 64, image.tobytes("raw", "BGR"), timeout=2)
+        deadline = time.monotonic() + 3
+        result = None
+        while result is None and time.monotonic() < deadline:
+            result = service.poll()
+            time.sleep(.01)
+        if (result is None or result.error or result.variant_count != 1 or len(result.hits) != 1
+                or result.hits[0].id != "texture" or result.hits[0].box != (11, 9, 16, 16)
+                or result.hits[0].score is None or result.hits[0].score < .97):
+            raise RuntimeError("Synthetic pack worker result failed.")
+        if sys.stdout is not None:
+            print("Pack template worker passed with synthetic pixels. No OS input or capture used.", flush=True)
+    finally:
+        service.close()
+
+
 def restricted_dispatch(original: Any) -> Any:
     """Prevent pinned pywebview's dotted getattr resolver exposing internals.
 
@@ -225,6 +273,57 @@ def _schedule_interface_scale(window: Any, percent: int, closing: threading.Even
             print("Interface size could not be changed.", file=sys.stderr)
 
 
+def _choose_pack_directory(window: Any) -> Path | None:
+    """Read one human selection from the native picker; never accept a JS path."""
+    from webview import FileDialog
+    selected = None
+    failed = False
+
+    def choose() -> None:
+        nonlocal selected, failed
+        try:
+            selected = window.create_file_dialog(FileDialog.FOLDER, allow_multiple=False)
+        except Exception:
+            failed = True
+
+    # Bridge calls run on Python worker threads. The pinned WinForms folder
+    # dialog does not marshal itself to the form's STA thread; Cocoa does.
+    if sys.platform == "win32" and window.native.InvokeRequired:
+        from System import Action
+        window.native.Invoke(Action(choose))
+    else:
+        choose()
+    if failed:
+        raise ValueError("The native pack picker could not open.")
+    if selected is None:
+        return None
+    if (type(selected) not in (tuple, list) or len(selected) != 1
+            or type(selected[0]) is not str or not selected[0] or len(selected[0]) > 4096):
+        raise ValueError("A single local pack folder is required.")
+    directory = Path(selected[0])
+    if not directory.is_absolute():
+        raise ValueError("A local absolute folder is required.")
+    return directory
+
+
+def _smoke_picker_thread(window: Any) -> None:
+    """Check real Windows STA dispatch without displaying a folder dialog."""
+    if sys.platform != "win32":
+        return
+    from types import SimpleNamespace
+    from System.Threading import ApartmentState, Thread
+    observed = []
+
+    def inspect_thread(*_args: Any, **_kwargs: Any) -> None:
+        if window.native.InvokeRequired or Thread.CurrentThread.GetApartmentState() != ApartmentState.STA:
+            raise RuntimeError("Pack picker did not reach its native UI thread.")
+        observed.append(True)
+
+    _choose_pack_directory(SimpleNamespace(native=window.native, create_file_dialog=inspect_thread))
+    if observed != [True]:
+        raise RuntimeError("Pack picker UI-thread check did not run.")
+
+
 def open_desktop(*, smoke: bool = False) -> None:
     """Run the native launcher, or a no-input bridge/navigation smoke check."""
     if sys.platform not in {"darwin", "win32"}:
@@ -269,6 +368,8 @@ def open_desktop(*, smoke: bool = False) -> None:
     window = webview.create_window(f"AFK Grinder {metadata['version']} · {identity}", url=url,
                                    js_api=api, width=1180, height=800, min_size=(620, 450),
                                    background_color="#090d19", text_select=True, zoomable=True)
+    if not smoke:
+        controller._pack_picker = lambda: _choose_pack_directory(window)
     guard: list[Any] = []
     failed = threading.Event()
     rejected = threading.Event()
@@ -378,6 +479,8 @@ def open_desktop(*, smoke: bool = False) -> None:
                 time.sleep(0.05)
             else:
                 raise RuntimeError("Launcher bridge startup timed out.")
+            stage = "picker_thread"
+            _smoke_picker_thread(window)
             stage = "sdk_service"
             # Keep native WebView startup separate from the SDK's own hard
             # 15-second process deadline, especially on cold Intel runners.
@@ -390,6 +493,8 @@ def open_desktop(*, smoke: bool = False) -> None:
             missing_sdk = result.error == "Recognition is optional. Install the locked recognition extra first."
             if not missing_sdk and (result.error or result.report is None):
                 raise RuntimeError("Spawned recognition service failed.")
+            stage = "pack_worker"
+            _smoke_pack_worker(missing_sdk=missing_sdk)
             stage = "private_popup_models"
             _smoke_popup_models()
             stage = "ui_state"
@@ -428,6 +533,16 @@ def open_desktop(*, smoke: bool = False) -> None:
                         })()""")
                         if fits is not True:
                             raise RuntimeError("Native launcher section overflowed at interface scale.")
+                        if route == "setup" and window.evaluate_js("""(() => {
+                            const panel = document.getElementById('pack-panel').getBoundingClientRect();
+                            return panel.width > 0 && panel.left >= 0 && panel.right <= innerWidth + 1 &&
+                                ['pack-choose', 'pack-check', 'pack-clear'].every(id => {
+                                    const rect = document.getElementById(id).getBoundingClientRect();
+                                    return rect.height >= 40 && rect.width >= 40 && rect.left >= 0 &&
+                                        rect.right <= innerWidth + 1;
+                                });
+                        })()""") is not True:
+                            raise RuntimeError("Native pack inspector controls overflowed at interface scale.")
                         if sys.stdout is not None:
                             print(f"Launcher smoke route: {route} viewport={width} zoom={percent}% "
                                   "fit=true stop=true.", flush=True)

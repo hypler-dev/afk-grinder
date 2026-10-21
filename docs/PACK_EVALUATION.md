@@ -5,6 +5,38 @@ explicitly selected split from one validated `afk-grinder-training` packet. It
 is static classification evidence. It does not capture a window, send input,
 approve a pack, establish temporal stability, or prove live readiness.
 
+## Runtime Setup inspector
+
+The desktop Setup inspector loads a pack only after a human chooses its folder
+through the native system picker. The bridge accepts no path. Version-1
+`pack.json` metadata has exactly these top-level keys:
+
+```text
+format, schema_version, id, version, min_app_version, provenance,
+reference_size, setup, assets, anchors, states, routines
+```
+
+`provenance` is `source`, `revision`, `license`, `attribution`; `setup` is
+`language`, `instructions`, `min_content_size`; assets carry `id`, `path`, and
+`sha256`; anchors carry `id`, `asset`, `roi`, `threshold`, and `scale_range`;
+states carry `id`, `positive`, `exclude`, `stable_frames`, and `kind`.
+`routines` must be empty. Unknown keys, unsafe paths, malformed assets, and
+hash mismatches fail closed. Encoded assets and decoded pixels stay in memory.
+
+The inspector warms a disposable child before requesting capture, then checks
+at most five genuinely fresh, distinct calibrated frames in one 30-second
+session. Source timestamps remain attached; each observation must be no more
+than 0.5 seconds old. Returned state and anchor metadata are historical,
+bound to the exact raw-preview ID, with boxes translated into preview
+coordinates. Stop/close, target/layout/reference changes, and a newer preview
+invalidate the evidence. This path has no input, readiness, approval, popup
+response, image-persistence, dataset-reuse, or model-download authority. The child is not an OS sandbox. Metadata loading has a 15-second logical timeout with late results revoked; it does not terminate a blocked filesystem call.
+
+The bridge uses three empty-payload commands: `pack_choose`, `pack_check`, and
+`pack_clear`. SDK-free application downloads fail closed when native matching
+is unavailable. Native calibration and held-out Adopt Me acceptance remain
+open.
+
 ## Run a selected fixture set
 
 Use the optional pinned SDK from the README's

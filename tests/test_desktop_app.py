@@ -1,6 +1,7 @@
 """Trusted-shell API boundaries with no WebView or native backend."""
 
 import io
+from pathlib import Path
 import subprocess
 import sys
 import threading
@@ -9,7 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from afk_grinder.desktop_app import (DesktopAPI, _document_failure, _schedule_interface_scale, _smoke_resize,
-                                    allowed_document, open_desktop, restricted_dispatch)
+                                    _choose_pack_directory, allowed_document, open_desktop, restricted_dispatch)
 
 
 class FakeController:
@@ -28,6 +29,58 @@ class FakeController:
 
 
 class ShellBoundaryTests(unittest.TestCase):
+    def test_native_pack_picker_accepts_one_absolute_folder_and_cancel(self):
+        window = Mock()
+        folder = object()
+        with patch.dict('sys.modules', {'webview': SimpleNamespace(FileDialog=SimpleNamespace(FOLDER=folder))}), \
+             patch('afk_grinder.desktop_app.sys.platform', 'darwin'):
+            window.create_file_dialog.return_value = None
+            self.assertIsNone(_choose_pack_directory(window))
+            window.create_file_dialog.return_value = [str(Path.cwd())]
+            self.assertEqual(_choose_pack_directory(window), Path.cwd())
+            window.create_file_dialog.assert_called_with(folder, allow_multiple=False)
+            for value in ([], ['relative'], ['one', 'two'], str(Path.cwd()), [True], ['x' * 4097]):
+                window.create_file_dialog.return_value = value
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    _choose_pack_directory(window)
+
+    def test_windows_picker_marshals_to_native_ui_thread(self):
+        active = False
+        calls = []
+        def invoke(callback):
+            nonlocal active
+            active = True
+            try:
+                callback()
+            finally:
+                active = False
+        def choose(*_args, **_kwargs):
+            self.assertTrue(active)
+            calls.append(True)
+            return [str(Path.cwd())]
+        window = SimpleNamespace(native=SimpleNamespace(InvokeRequired=True, Invoke=invoke),
+                                 create_file_dialog=choose)
+        with patch.dict('sys.modules', {
+            'webview': SimpleNamespace(FileDialog=SimpleNamespace(FOLDER=object())),
+            'System': SimpleNamespace(Action=lambda callback: callback),
+        }), patch('afk_grinder.desktop_app.sys.platform', 'win32'):
+            self.assertEqual(_choose_pack_directory(window), Path.cwd())
+        self.assertEqual(calls, [True])
+
+    def test_windows_picker_contains_callback_errors_and_supports_ui_thread_call(self):
+        window = Mock()
+        window.native.InvokeRequired = False
+        window.create_file_dialog.side_effect = RuntimeError('/private/sensitive-folder')
+        with patch.dict('sys.modules', {
+            'webview': SimpleNamespace(FileDialog=SimpleNamespace(FOLDER=object())),
+        }), patch('afk_grinder.desktop_app.sys.platform', 'win32'):
+            with self.assertRaisesRegex(ValueError, '^The native pack picker could not open.$'):
+                _choose_pack_directory(window)
+            window.native.Invoke.assert_not_called()
+            window.create_file_dialog.side_effect = None
+            window.create_file_dialog.return_value = None
+            self.assertIsNone(_choose_pack_directory(window))
+
     def test_pending_real_webview_reply_cannot_hold_process_after_ui_close(self):
         script = '''
 import threading

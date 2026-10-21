@@ -21,6 +21,7 @@ from typing import Any
 
 from afk_grinder import __version__
 from afk_grinder.recognition.matcher import TemplateHit, TemplateMatcher
+from afk_grinder.recognition.pack_results import PackResultError, aggregate_hits
 from afk_grinder.recognition.packs import PackError, ResourcePack, load_pack
 from afk_grinder.recognition.state import StaticInspection, classify_scores
 from afk_grinder.training_packet import (
@@ -78,40 +79,14 @@ def _read_json(path: Path, limit: int) -> dict[str, Any]:
 
 
 def _aggregate(pack: ResourcePack, compiled: Any, hits: tuple[TemplateHit, ...]) -> tuple[dict[str, float | None], list[dict[str, Any]]]:
-    expected = {item.spec.template_id: item for item in compiled.templates}
-    if type(hits) is not tuple or len(hits) != len(expected):
-        raise EvaluationError("recognition_failed")
-    received = set()
-    by_anchor: dict[str, list[TemplateHit]] = {anchor.id: [] for anchor in pack.anchors}
-    for hit in hits:
-        if type(hit) is not TemplateHit or hit.template_id not in expected or hit.template_id in received:
-            raise EvaluationError("recognition_failed")
-        item = expected[hit.template_id]
-        if type(hit.score) not in (int, float) or not math.isfinite(hit.score) or not 0 <= hit.score <= 1:
-            raise EvaluationError("recognition_failed")
-        if hit.box is not None:
-            if (type(hit.box) is not tuple or len(hit.box) != 4 or any(type(v) is not int for v in hit.box)
-                    or hit.score < item.spec.threshold):
-                raise EvaluationError("recognition_failed")
-            x, y, width, height = hit.box
-            rx, ry, rw, rh = item.spec.roi
-            if (width != item.spec.width or height != item.spec.height or x < rx or y < ry
-                    or x + width > rx + rw or y + height > ry + rh):
-                raise EvaluationError("recognition_failed")
-        by_anchor[item.anchor_id].append(hit)
-        received.add(hit.template_id)
-    scores: dict[str, float | None] = {}
-    anchors = []
-    for anchor in pack.anchors:
-        variants = by_anchor[anchor.id]
-        if not variants:
-            raise EvaluationError("recognition_failed")
-        best = max(variants, key=lambda item: item.score)
-        # An absent hit at a zero threshold cannot assert positive evidence.
-        score = float(best.score) if best.box is not None or best.score < anchor.threshold else None
-        scores[anchor.id] = score
-        anchors.append({"id": anchor.id, "score": score, "box": list(best.box) if best.box is not None else None})
-    return scores, anchors
+    try:
+        hits_by_anchor = aggregate_hits(pack, compiled, hits)
+    except (PackResultError, ValueError, TypeError):
+        raise EvaluationError("recognition_failed") from None
+    return ({hit.id: hit.score for hit in hits_by_anchor}, [
+        {"id": hit.id, "score": hit.score, "box": list(hit.box) if hit.box is not None else None}
+        for hit in hits_by_anchor
+    ])
 
 
 def evaluate_fixtures(pack: ResourcePack, packet: TrainingPacket, directory: Path, *,

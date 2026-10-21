@@ -7,6 +7,7 @@ platform module. Native backend work is confined to short-lived daemon jobs.
 from __future__ import annotations
 
 import base64
+from copy import deepcopy
 from dataclasses import dataclass
 import math
 import queue
@@ -17,7 +18,9 @@ import time
 from typing import Any, Callable
 import zlib
 import uuid
+from pathlib import Path
 from dataclasses import asdict
+from afk_grinder import __version__
 from afk_grinder.replay import ReplaySettings
 from afk_grinder.session_recorder import SessionRecorder
 
@@ -127,6 +130,9 @@ class DesktopController:
         buildmetadata: dict[str, Any] | None = None,
         replay_service: Any = None,
         recorder_factory: Any = SessionRecorder,
+        pack_picker: Callable[[], Path | None] | None = None,
+        pack_loader: Any = None,
+        pack_session_factory: Any = None,
     ) -> None:
         self._backend = backend
         self._runner = runner if runner is not None else Runner(backend)
@@ -187,6 +193,19 @@ class DesktopController:
         self._popup_state = "unknown"
         self._popup_message = "Calibrate content before checking popups."
         self._allow_reconnect = False
+        self._pack_picker = pack_picker
+        self._pack_loader = pack_loader
+        self._pack_session_factory = pack_session_factory
+        self._pack = None
+        self._pack_phase = "empty"
+        self._pack_message = "Choose a local recognition pack. It cannot run actions."
+        self._pack_inspection = None
+        self._pack_generation = 0
+        self._pack_cancel = threading.Event()
+        self._pack_selecting = False
+        self._pack_loading = False
+        self._pack_load_started = 0.0
+        self._pack_thread: threading.Thread | None = None
         metadata = dict(buildmetadata or {})
         self._app = {
             "version": str(metadata.get("version", "0.2.0")),
@@ -244,6 +263,7 @@ class DesktopController:
                     "error": dict(self._preview_error) if self._preview_error else None,
                 },
                 "sdk": {"phase": self._sdk_phase, "message": self._sdk_message},
+                "pack": self._pack_state_locked(),
                 "popup": {
                     "phase": self._popup_phase, "state": self._popup_state,
                     "message": self._popup_message,
@@ -293,6 +313,7 @@ class DesktopController:
             "popup_check", "popup_resolve", "set_reconnect",
             "replay_settings", "replay_select", "replay_frame", "replay_delete",
             "replay_older", "replay_sessions",
+            "pack_choose", "pack_check", "pack_clear",
         }
         if name not in allowed:
             return self._response(False, "unknown_command", "Command is not supported.")
@@ -335,6 +356,19 @@ class DesktopController:
                 self._reset_area()
             elif name == "check_area":
                 self._check_area(payload)
+            elif name in {"pack_choose", "pack_check", "pack_clear"}:
+                self._require_payload(payload, set())
+                if name == "pack_choose":
+                    self._choose_pack()
+                elif name == "pack_check":
+                    self._start_pack_check()
+                else:
+                    with self._lock:
+                        self._require_reference_mutation_locked()
+                        self._invalidate_pack_locked()
+                        self._pack = None
+                        self._pack_phase = "empty"
+                        self._pack_message = "Local pack cleared. No input was sent."
             elif name in {"popup_check", "popup_resolve"}:
                 self._require_payload(payload, set())
                 self._start_popup(name == "popup_resolve")
@@ -364,6 +398,7 @@ class DesktopController:
         with self._lock:
             self._closing = True
             self._popup_cancel.set()
+            self._invalidate_pack_locked()
             self._acknowledged = False
             if self._start_cancel is not None:
                 self._start_cancel.set()
@@ -378,7 +413,7 @@ class DesktopController:
                 self._close_stop_started = True
                 threading.Thread(target=self._close_stop, daemon=True, name="close-stop").start()
             return (self._close_stop_done.is_set() and not self._starting
-                    and not bool(getattr(self._runner, "running", False)))
+                    and not bool(getattr(self._runner, "running", False)) and not self._pack_check_busy())
 
     def _close_stop(self) -> None:
         try:
@@ -407,6 +442,9 @@ class DesktopController:
             self._scan_generation += 1
             self._clear_target_locked()
             self._clear_preview_locked()
+            self._pack = None
+            self._pack_phase = "empty"
+            self._pack_message = "Choose a local recognition pack for this game."
             self._acknowledged = False
             self._message = "Game changed. Select setup again."
             self._readiness_phase = "unknown"
@@ -487,6 +525,7 @@ class DesktopController:
                 raise RuntimeError("This game profile cannot start input.")
             if bool(getattr(self._runner, "cleanup_failed", False)):
                 raise RuntimeError("Input cleanup needs manual attention before another run.")
+            self._invalidate_pack_locked()
             target = self._targets.get(self._selected_id or "")
             if not dry_run:
                 if not acknowledged or target is None or self._readiness_phase != "ready":
@@ -528,6 +567,7 @@ class DesktopController:
     def _stop(self) -> None:
         with self._lock:
             self._popup_cancel.set()
+            self._invalidate_pack_locked()
             self._popup_phase = "idle"
             self._popup_state = "unknown"
             self._popup_message = "Popup operation stopped; fresh checks required."
@@ -538,6 +578,237 @@ class DesktopController:
             self._message = "Stopping input." if active else "Input stopped."
             self._run_phase = "stopping" if active else "stopped"
         self._runner.stop()
+
+    def _pack_check_busy(self) -> bool:
+        return self._pack_thread is not None and self._pack_thread.is_alive()
+
+    def _invalidate_pack_locked(self) -> None:
+        self._pack_generation += 1
+        self._pack_cancel.set()
+        self._pack_loading = False
+        self._pack_inspection = None
+        self._pack_phase = "ready" if self._pack is not None else "empty"
+        self._pack_message = "Fresh inspection required. No input was sent."
+
+    def _pack_layout_matches_locked(self) -> bool:
+        if self._pack is None or self._content_calibration is None:
+            return False
+        _, _, width, height = self._content_calibration.viewport
+        reference_width, reference_height = self._pack.reference_size
+        return (abs((width / height) / (reference_width / reference_height) - 1) <= .01
+                and width >= self._pack.setup.min_content_size[0]
+                and height >= self._pack.setup.min_content_size[1])
+
+    def _can_pack_check_locked(self) -> bool:
+        target = self._targets.get(self._selected_id or "")
+        return bool(not self._closing and not self._busy_locked() and self._game_id == "adopt"
+                    and not bool(getattr(self._runner, "cleanup_failed", False))
+                    and self._pack_phase in {"ready", "result", "error"}
+                    and target is not None and self._content_calibration is not None
+                    and self._content_calibration.source_layout.target == target
+                    and self._pack_layout_matches_locked())
+
+    def _pack_state_locked(self) -> dict[str, Any]:
+        busy = self._pack_selecting or self._pack_loading or self._pack_check_busy()
+        idle = (not self._closing and not self._busy_locked() and self._game_id == "adopt"
+                and not bool(getattr(self._runner, "cleanup_failed", False)))
+        message = self._pack_message
+        if self._game_id != "adopt":
+            message = "Local recognition packs are available for Adopt Me only."
+        elif self._pack_phase == "ready":
+            if self._content_calibration is None:
+                message = "Pack selected. Bind Roblox and calibrate its content area before inspection."
+            elif not self._pack_layout_matches_locked():
+                message = "This pack needs a matching content aspect ratio and minimum size."
+        return {
+            "phase": self._pack_phase, "id": self._pack.id if self._pack else None,
+            "version": self._pack.version if self._pack else None,
+            "source": self._pack.provenance.source if self._pack else None,
+            "message": message, "read_only": True, "busy": busy,
+            "can_choose": idle and self._pack_picker is not None,
+            "can_clear": idle and self._pack is not None,
+            "can_check": self._can_pack_check_locked(),
+            "inspection": deepcopy(self._pack_inspection),
+        }
+
+    def _choose_pack(self) -> None:
+        with self._lock:
+            if (self._closing or self._busy_locked() or self._game_id != "adopt"
+                    or self._pack_picker is None or bool(getattr(self._runner, "cleanup_failed", False))):
+                raise RuntimeError("Stop active work before choosing a local pack.")
+            self._invalidate_pack_locked()
+            generation = self._pack_generation
+            self._pack_cancel = cancel = threading.Event()
+            self._pack_selecting = True
+            self._pack_phase = "selecting"
+            self._pack_message = "Choose a pack folder in the system picker."
+            self._acknowledged = False
+            picker = self._pack_picker
+        try:
+            directory = picker()
+        except Exception:
+            directory = False
+        with self._lock:
+            self._pack_selecting = False
+            if self._closing or cancel.is_set() or generation != self._pack_generation:
+                return
+            if directory is None:
+                self._pack_phase = "ready" if self._pack else "empty"
+                self._pack_message = "Folder selection canceled. No input was sent."
+                return
+            if not isinstance(directory, Path) or not directory.is_absolute():
+                self._pack_phase = "error"
+                self._pack_message = "The system picker could not select a pack folder."
+                return
+            self._pack = None
+            self._pack_loading = True
+            self._pack_load_started = self._clock()
+            self._pack_phase = "loading"
+            self._pack_message = "Checking local pack metadata and asset hashes."
+
+        def load() -> None:
+            try:
+                from afk_grinder.recognition.packs import ResourcePack, load_pack
+                if self._pack_loader is None:
+                    pack = load_pack(directory, app_version=__version__)
+                else:
+                    pack = self._pack_loader(directory)
+                if type(pack) is not ResourcePack or not pack.anchors or not pack.states:
+                    raise ValueError("A recognition pack needs anchors and states.")
+                error = False
+            except Exception:
+                pack, error = None, True
+            with self._lock:
+                if self._closing or cancel.is_set() or generation != self._pack_generation:
+                    return
+                self._pack_loading = False
+                self._pack = pack
+                self._pack_phase = "error" if error else "ready"
+                self._pack_message = ("The pack could not be loaded. Choose a valid local recognition pack."
+                                      if error else "Pack selected for read-only inspection. It cannot run actions.")
+        threading.Thread(target=load, daemon=True, name="pack-metadata").start()
+
+    def _start_pack_check(self) -> None:
+        with self._lock:
+            if not self._can_pack_check_locked():
+                raise RuntimeError("Pack inspection needs an idle session, selected Roblox and matching calibrated content.")
+            self._invalidate_pack_locked()
+            self._pack_cancel = cancel = threading.Event()
+            generation, pack, calibration = self._pack_generation, self._pack, self._content_calibration
+            self._acknowledged = False
+            self._popup_cancel.set()
+            self._popup_phase, self._popup_state = "idle", "unknown"
+            self._popup_message = "Fresh popup checks required."
+            self._pack_phase = "checking"
+            self._pack_message = "Inspecting fresh frames. Stop cancels inspection. No input is sent."
+
+            def guard() -> None:
+                with self._lock:
+                    if (cancel.is_set() or self._closing or generation != self._pack_generation
+                            or pack is not self._pack or calibration is not self._content_calibration
+                            or self._targets.get(self._selected_id or "") != calibration.source_layout.target):
+                        raise RuntimeError("Pack inspection canceled.")
+
+            def wait(seconds: float) -> None:
+                cancel.wait(seconds)
+                guard()
+
+            def progress(message: str) -> None:
+                with self._lock:
+                    guard()
+                    self._pack_message = "Inspecting bounded fresh frames. No input is sent."
+
+            def check() -> None:
+                operation = None
+                try:
+                    from afk_grinder.pack_inspection import PackInspectionSession
+                    factory = self._pack_session_factory or PackInspectionSession
+                    guard()
+                    operation = factory(pack, calibration)
+                    report = operation.run(guard, wait, progress=progress)
+                    guard()
+                    with self._lock:
+                        guard()
+                        self._publish_pack_report_locked(report, pack, calibration)
+                except Exception as error:
+                    with self._lock:
+                        if not cancel.is_set() and not self._closing and generation == self._pack_generation:
+                            if getattr(error, "code", None) in {"capture_failed", "layout_changed", "stale"}:
+                                self._clear_preview_locked()
+                            self._pack_inspection = None
+                            self._pack_phase = "error"
+                            self._pack_message = "Inspection failed. Check the selected pack, capture access and content area."
+                finally:
+                    if operation is not None:
+                        try:
+                            operation.close()
+                        except Exception:
+                            with self._lock:
+                                if not cancel.is_set() and generation == self._pack_generation:
+                                    self._pack_inspection = None
+                                    self._pack_phase = "error"
+                                    self._pack_message = "Inspection cleanup failed. No input was sent."
+            self._pack_thread = threading.Thread(target=check, daemon=True, name="pack-check")
+            self._pack_thread.start()
+
+    def _publish_pack_report_locked(self, report: Any, pack: Any, calibration: ContentCalibration) -> None:
+        from afk_grinder.pack_inspection import PackInspectionReport
+        from afk_grinder.recognition.pack_results import validate_anchor_hits
+        from afk_grinder.recognition.state import StateInspection, classify_scores
+        if type(report) is not PackInspectionReport or layout_from_capture(report.frame) != calibration.source_layout:
+            raise ValueError("Invalid inspection report.")
+        _, _, width, height = calibration.viewport
+        hits = validate_anchor_hits(pack, (width, height), report.anchors)
+        state = report.state
+        if (type(state) is not StateInspection or state.status not in {"unknown", "known", "blocked"}
+                or type(state.stable_frames) is not int or not 0 <= state.stable_frames <= 5
+                or type(report.required_frames) is not int or not 0 <= report.required_frames <= 5
+                or type(report.observed_frames) is not int or not 1 <= report.observed_frames <= 5
+                or state.stable_frames > report.observed_frames):
+            raise ValueError("Invalid inspection state.")
+        static = classify_scores(pack, {hit.id: hit.score for hit in hits})
+        candidate = next((item for item in pack.states if item.id == static.state_id), None)
+        required = candidate.stable_frames if candidate is not None else 0
+        if report.required_frames != required:
+            raise ValueError("Invalid inspection state.")
+        if state.reason == "unstable":
+            valid_state = (candidate is not None and state.status == "unknown" and state.state_id is None
+                           and state.kind is None and 0 < state.stable_frames < required)
+        elif candidate is not None:
+            expected_status = "known" if static.status == "candidate" else static.status
+            expected_reason = "stable" if static.status == "candidate" else static.reason
+            valid_state = (state.status == expected_status and state.reason == expected_reason
+                           and state.state_id == static.state_id and state.kind == static.kind
+                           and state.stable_frames == required)
+        else:
+            valid_state = (state.status == static.status and state.reason == static.reason
+                           and state.state_id is None and state.kind is None and state.stable_frames == 0)
+        if not valid_state:
+            raise ValueError("Invalid inspection state.")
+        self._preview_id += 1
+        self._preview_phase = "historical"
+        self._preview_width, self._preview_height = report.frame.physical_size
+        self._preview_region_kind = report.frame.region_kind
+        self._preview_verified = report.frame.content_verified
+        self._preview_error = None
+        self._preview_frame = report.frame
+        self._preview_layout = calibration.source_layout
+        self._preview_png = None
+        offset_x, offset_y, _, _ = calibration.viewport
+        self._pack_inspection = {
+            "status": "unstable" if state.reason == "unstable" else state.status,
+            "state_id": state.state_id, "kind": state.kind, "reason": state.reason,
+            "stable_count": state.stable_frames, "required_frames": report.required_frames,
+            "historical": True, "preview_id": self._preview_id,
+            "width": self._preview_width, "height": self._preview_height,
+            "anchors": [{"id": hit.id, "score": hit.score, "box": None if hit.box is None else {
+                "x": hit.box[0] + offset_x, "y": hit.box[1] + offset_y,
+                "width": hit.box[2], "height": hit.box[3],
+            }} for hit in hits],
+        }
+        self._pack_phase = "result"
+        self._pack_message = "Historical visual result. It does not establish current gameplay readiness."
+        self._encode_preview_async(self._preview_id, report.frame)
 
     def _popup_busy(self) -> bool:
         return self._popup_thread is not None and self._popup_thread.is_alive()
@@ -722,6 +993,7 @@ class DesktopController:
 
     def _clear_geometry_locked(self) -> None:
         self._popup_cancel.set()
+        self._invalidate_pack_locked()
         self._popup_state = "unknown"
         self._popup_phase = "idle"
         self._popup_message = "Calibrate content before checking popups."
@@ -736,6 +1008,7 @@ class DesktopController:
             self._area = None
             self._area_layout = None
             self._content_calibration = None
+            self._invalidate_pack_locked()
             self._tracker.invalidate()
 
     def _set_area(self, payload: dict[str, Any]) -> None:
@@ -760,6 +1033,7 @@ class DesktopController:
             self._area = Rect(x, y, width, height)
             self._area_layout = self._preview_layout
             self._content_calibration = None
+            self._invalidate_pack_locked()
             self._tracker.invalidate()
 
     def _check_area(self, payload: dict[str, Any]) -> None:
@@ -777,6 +1051,7 @@ class DesktopController:
             if target is None:
                 raise RuntimeError("Select a verified Roblox target first.")
             area, layout = self._area, self._area_layout
+            self._invalidate_pack_locked()
             self._preview_id += 1
             self._preview_frame = None
             self._preview_layout = None
@@ -827,6 +1102,10 @@ class DesktopController:
         cancel_job = None
         rescan = False
         with self._lock:
+            if self._pack_loading and self._clock() - self._pack_load_started > 15:
+                self._invalidate_pack_locked()
+                self._pack_phase = "error"
+                self._pack_message = "Pack metadata loading timed out. Choose the local folder again."
             if self._scan_thread is not None and self._scan_thread.is_alive() and self._clock() - self._scan_started_at > _SCAN_TIMEOUT:
                 self._scan_generation += 1
                 self._clear_target_locked()
@@ -1038,7 +1317,8 @@ class DesktopController:
 
     def _busy_locked(self) -> bool:
         return (self._starting or bool(getattr(self._runner, "running", False))
-                or self._job is not None or self._popup_busy())
+                or self._job is not None or self._popup_busy() or self._pack_selecting
+                or self._pack_loading or self._pack_check_busy())
 
     def _require_reference_mutation_locked(self) -> None:
         if self._game_id != "adopt" or self._busy_locked() or bool(getattr(self._runner, "cleanup_failed", False)):
