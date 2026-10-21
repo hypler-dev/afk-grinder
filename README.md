@@ -179,6 +179,8 @@ Build output is ignored by Git. Windows installer creation and macOS distributio
 
 Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/actions/workflows/build.yml), select a successful run, and scroll to **Artifacts**. GitHub requires a signed-in account with read access to download workflow artifacts; this repository is public.
 
+Latest bounded-session test builds: [run 39547747564](https://github.com/hypler-dev/afk-grinder/actions/runs/39547747564), source `43960f4`. Windows x64 and both Mac targets passed; all nine artifact ZIP digests and the three application archives passed controller and independent static checks. Downloads remain SDK-free input prototypes. They contain the shared session safeguards, but this does not establish native popup/reconnect or care acceptance. Exact hashes and limits are in [plan.md](plan.md).
+
 | Download | Target | Contents |
 | --- | --- | --- |
 | `AFKGrinder-windows-x64-<commit>` | Windows x64 | Portable application ZIP; extract the entire directory and open `AFKGrinder.exe` |
@@ -187,7 +189,7 @@ Open [Build desktop prototypes](https://github.com/hypler-dev/afk-grinder/action
 
 GitHub wraps each artifact in a download ZIP. Extract it, then extract the application archive inside. Keep the Windows executable beside its runtime files. The Mac archive preserves app-bundle symlinks and executable permissions. Each artifact includes `SHA256SUMS.txt` and `BUILD_INFO.json` identifying the exact source revision and architecture. Artifacts expire after 14 days; use **Run workflow** to rebuild when needed.
 
-The workflow runs for app/build changes pushed to `main` and pull requests targeting `main`, plus manual dispatch. Each target is configured to require safety/packaging tests, fake-input legacy UI checks, real launcher bridge/navigation smoke, a native build, and packaged dry-run/readiness checks before uploading. This describes required gates; it does not establish a successful new-launcher run. macOS permission denial is expected on fresh runners; missing native modules or other startup errors fail the build. No Roblox session or game input runs in CI.
+The workflow runs for app/build changes pushed to `main` and pull requests targeting `main`, plus manual dispatch. Each target requires safety/packaging tests, fake-input legacy UI checks, real launcher bridge/navigation smoke, a native build, and packaged dry-run/readiness checks before uploading. Run-specific results and limits are recorded in [plan.md](plan.md). macOS permission denial is expected on fresh runners; missing native modules or other startup errors fail the build. No Roblox session or game input runs in CI.
 
 These are unsigned prototype bundles, not production installers or gameplay certification. OS signing/trust warnings may appear. This project does not disable OS protections or change permissions automatically. Live testing still requires your own manual Roblox sign-in and explicit input permissions.
 
