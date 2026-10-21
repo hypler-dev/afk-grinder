@@ -142,7 +142,7 @@ The optional [local authoring command](docs/LOCAL_AUTHORING.md) uses an explicit
 
 Replay data stays local and is never uploaded or reused for training by default. The recorder stops on focus loss, Escape, cancellation, capture/calibration failure, or protected content. The recorder may queue a raw in-memory crop, but the store applies masking before encoding or persistence; an unmasked sensitive or unknown frame is never encoded or persisted.
 
-The separate [training crop compiler](docs/TRAINING_COMPILER.md) converts reviewed train-image crops into an unapproved recognition candidate for static evaluation. It requires a crop recipe and separate consent to save local PNG derivatives. Original state kinds remain fixed, held-out images cannot supply templates, and candidates contain no routines or live approval.
+The separate [training crop compiler](docs/TRAINING_COMPILER.md) converts reviewed train-image crops into an unapproved recognition candidate for static evaluation. It requires a crop recipe and separate consent to save local PNG derivatives. Original state kinds remain fixed, held-out images cannot supply templates, and candidates contain no routines or live approval. All three frozen targets pass crop export and absent-held-out-file checks in [run 39543856106](https://github.com/hypler-dev/afk-grinder/actions/runs/39543856106) for source `fa2ab48`; independently checked SDK-free artifacts contain the compiler. These synthetic checks do not establish actual Adopt Me recognition or care completion. Exact evidence is in [plan.md](plan.md).
 
 ## Safety limits
 
