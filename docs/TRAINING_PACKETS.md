@@ -24,7 +24,7 @@ The parser rejects duplicate JSON keys, non-finite and floating JSON numbers, un
 2. The optional [local authoring command](LOCAL_AUTHORING.md) sends only explicitly selected train examples to an already installed local vision model and validates new labels, states and semantic requests. It has no execution or approval authority.
 3. Run `parse_training_packet(text)` for schema checks.
 4. Review held-out examples separately. Held-out items never enter `fine_tuning_records`.
-5. A separately approved future compiler may translate reviewed data into a restricted runtime pack. This module provides no compiler or approval path.
+5. Use a separately reviewed [crop recipe and compiler](TRAINING_COMPILER.md) to export selected train crops into an unapproved recognition candidate. Export requires its own consent, preserves state kinds and emits no routines. Evaluate that candidate with separate held-out fixtures before further human review; compilation supplies no approval or activation path.
 
 The current runtime evaluator is a separate, explicit-consent path. Use the
 [pack evaluation guide](PACK_EVALUATION.md) for the CLI and evidence boundary. It reads only the

@@ -16,8 +16,8 @@ Developer-only static fixture evaluation is available through
 `held_out`, maximum 64 examples), and writes a new metadata-only report. It
 uses a disposable child with a 120-second deadline; this is not an OS sandbox.
 The runtime pack compiler accepts validated pack data and bounded uniform-scale
-template variants. A future training-to-pack proposal compiler is separate and
-not implemented. Static candidates are unstabilized; protected states block,
+template variants. The separate training-to-pack compiler exports explicitly
+consented train crops into an unapproved recognition-only candidate. Static candidates are unstabilized; protected states block,
 and evaluation does not establish temporal stability, live readiness, approval,
 input, capture, or publication.
 
@@ -112,6 +112,8 @@ Model output is untrusted proposal data. It cannot send input, execute code, alt
 The optional `--author-local` CLI requires an explicit installed model tag/digest, local training packet, fixture directory, one to four train IDs, new output path and separate authoring consent. A disposable worker reads a private validated metadata snapshot, hash-checks only those selected images, strips source metadata and sends proportional JPEG derivatives to a literal-loopback Ollama connection. Before image transmission the server must report cloud disabled and the selected local GGUF must match the requested digest and vision/completion capabilities; digest and cloud checks repeat after generation. No server start, pull, configuration mutation, proxy, redirect or cloud fallback is implemented. The fixed HTTP budget is 50 seconds within a 60-second child deadline; resource settings are budgets, not an OS sandbox or total-memory cap.
 
 Only bounded new states, selected train-label changes and semantic demonstration requests can merge into a strict draft. Original states, nonselected/validation/held-out examples, game identity and image metadata remain immutable; selected transaction labels cannot be downgraded. The parent reconstructs the merge and validates the complete packet before accepting a worker result. Output is exclusive local JSON containing the draft and bounded metadata, with no saved images, prompts or unvalidated responses. Approval, runtime-pack, input, capture, image persistence, weight-training and held-out-prompt flags remain false. Synthetic loopback/worker tests are separate from real-model evaluation and native game acceptance. See [LOCAL_AUTHORING.md](docs/LOCAL_AUTHORING.md).
+
+The separate `--compile-training` command requires a strict training packet, reviewed crop recipe, explicit fixture directory, new output directory and dedicated `--compile-consent`. It exports at most sixteen PNG anchors from at most four train images with sixteen megapixels total source pixels per pass. Reference geometry and original state kinds are preserved; validation/held-out pixels are excluded, and demonstration requests never become routines. The sixty-second disposable child loads hash-checked selected fixtures and emits private staging. Before writing new private output files, the parent independently reloads the same selected hash-checked sources and rebuilds the crops, requiring exact asset/manifest byte equality and an input-bound metadata receipt. The worker deadline does not impose a hard total deadline on this separate capped parent verification. `proposal.json` remains a draft with approval/readiness/input/capture/training/held-out flags false and image persistence true. No output is activated or added to a curated game profile. See [TRAINING_COMPILER.md](docs/TRAINING_COMPILER.md).
 
 ### Opt-in local replay
 

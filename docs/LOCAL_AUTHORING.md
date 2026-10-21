@@ -36,6 +36,8 @@ The model may add new states, propose labels for selected train examples and req
 
 All approval, runtime-pack, native-input, capture, image-persistence, weight-training and held-out-prompt flags remain false. A valid draft can still be wrong. Human review and separate held-out evaluation are required; there is no automatic pack conversion, activation or live routine path.
 
+After review, save `report.packet` as a standalone training packet. The separate [crop compiler](TRAINING_COMPILER.md) can combine it with a reviewed train-only crop recipe to produce an unapproved recognition candidate. That export requires separate consent to persist image crops; it never inherits the metadata-only authoring consent or turns demonstration requests into routines.
+
 Failures save only a fixed code such as `cloud_required`, `model_changed`, `fixture_invalid`, `proposal_invalid` or `timeout`. Native/server exception text and raw replies are not logged. A failed or timed-out proposal never becomes a partial success.
 
 ## Evidence boundary

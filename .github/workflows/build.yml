@@ -171,6 +171,18 @@ jobs:
             tests.test_local_authoring.LocalAuthoringTests.test_real_disposable_worker_with_synthetic_loopback_protocol \
             tests.test_local_authoring.LocalAuthoringTests.test_real_worker_sends_no_images_when_cloud_status_is_not_disabled -v
 
+      - name: Check frozen training crop compilation with synthetic fixtures
+        run: |
+          if [ '${{ matrix.label }}' = 'windows-x64' ]; then
+            compile_executable='dist/AFKGrinder/AFKGrinder.exe'
+          else
+            compile_executable='dist/AFKGrinder.app/Contents/MacOS/AFKGrinder'
+          fi
+          AFK_GRINDER_TEST_COMPILE_EXECUTABLE="$compile_executable" \
+            uv run --locked --extra build --extra recognition python -m unittest \
+            tests.test_training_compile.TrainingCompileTests.test_real_disposable_worker_exports_valid_recognition_candidate \
+            tests.test_training_compile.TrainingCompileTests.test_real_worker_does_not_read_validation_or_held_out_files -v
+
       - name: Package test download with source metadata and checksum
         run: >-
           uv run --locked --extra build --extra recognition python tools/package_build.py

@@ -22,6 +22,8 @@ def main() -> None:
     mode.add_argument("--fixture-worker", type=Path, help=argparse.SUPPRESS)
     mode.add_argument("--author-local", type=Path, metavar="PACK", help="Create a local model-authored training draft; no input or capture")
     mode.add_argument("--author-worker", type=Path, metavar="PACK", help=argparse.SUPPRESS)
+    mode.add_argument("--compile-training", type=Path, metavar="PACK", help="Export selected train crops as an unapproved recognition candidate")
+    mode.add_argument("--compile-worker", type=Path, metavar="PACK", help=argparse.SUPPRESS)
     parser.add_argument("--sdk-report", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--sdk-replacement-probe", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--training-packet", type=Path, help="Validated draft JSON describing selected image fixtures")
@@ -35,11 +37,47 @@ def main() -> None:
     parser.add_argument("--author-output", type=Path, metavar="NEWPATH", help="New local metadata-only authoring report")
     parser.add_argument("--author-consent", action="store_true", help="Consent to local selected-fixture authoring; no input or capture")
     parser.add_argument("--author-port", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--crop-recipe", type=Path, help="Strict crop recipe selecting train examples and recognition anchors")
+    parser.add_argument("--compile-output", type=Path, metavar="NEWDIR", help="New private local directory for draft template crops")
+    parser.add_argument("--compile-consent", action="store_true", help="Consent to reading selected train images and saving their cropped derivatives")
+    parser.add_argument("--compile-report", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.sdk_report and not args.sdk_worker:
         parser.error("--sdk-report is reserved for the SDK diagnostic worker.")
     if args.sdk_replacement_probe and not args.sdk_worker:
         parser.error("--sdk-replacement-probe is reserved for the SDK diagnostic worker.")
+    compiling = args.compile_training is not None or args.compile_worker is not None
+    compile_options = (args.crop_recipe, args.compile_output, args.compile_consent, args.compile_report)
+    if not compiling and any(value is not None and value is not False for value in compile_options):
+        parser.error("Compilation options require --compile-training.")
+    if compiling:
+        conflicts = (args.training_packet, args.fixture_report, args.fixture_consent, args.fixture_split,
+                     args.author_model, args.author_digest, args.author_output, args.author_consent,
+                     args.author_port, args.author_example)
+        if any(value is not None and value is not False and value != [] for value in conflicts):
+            parser.error("Compilation cannot use fixture-evaluation or authoring options.")
+        if not all((args.crop_recipe, args.fixture_directory, args.compile_output, args.compile_consent)):
+            parser.error("Compilation requires --crop-recipe, --fixture-directory, --compile-output and --compile-consent.")
+        if args.compile_worker is None and args.compile_report is not None:
+            parser.error("--compile-report is reserved for the compilation worker.")
+        if args.compile_worker is not None and args.compile_report is None:
+            parser.error("Compilation worker requires --compile-report.")
+        from .training_compile import CompilationError, run_compile, worker
+
+        try:
+            if args.compile_worker is not None:
+                worker(args.compile_worker, args.crop_recipe, args.fixture_directory,
+                       args.compile_output, args.compile_report, consent=args.compile_consent)
+                return
+            run_compile(args.compile_training, args.crop_recipe, args.fixture_directory,
+                        args.compile_output, consent=args.compile_consent)
+        except CompilationError as error:
+            if sys.stderr is not None:
+                print(f"Training compilation failed: {error.code}. No input or capture ran.", file=sys.stderr)
+            sys.exit(1)
+        if sys.stdout is not None:
+            print("Draft recognition candidate saved. No approval, activation, input or capture.")
+        return
     authoring = args.author_local is not None or args.author_worker is not None
     author_options = (args.author_model, args.author_digest, args.author_example, args.author_output,
                       args.author_consent, args.author_port)
